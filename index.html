@@ -151,48 +151,34 @@
         let timerInterval;
 
         let basketX = 0;
-        let targetBasketX = 0; // ตำแหน่งเป้าหมายที่มือสั่ง
+        let targetBasketX = 0; 
         let basketY = 0;
         const basketWidth = 160;
         const basketHeight = 70;
 
         let currentItem = null; 
-        const itemSize = 50; 
+        const itemSize = 55; 
 
         // รูปพื้นหลังธรรมชาติ
         const imgBackground = new Image();
         imgBackground.crossOrigin = "anonymous";
         imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=1000';
 
-        // 🍎 คลังไอเทมใหม่ (มีผลไม้ 7 ชนิด + อุปสรรค 2 ชนิด)
+        // 🍎 คลังของตก (ปรับ Speed เพิ่มขึ้น 2 เท่าจากเดิม ตกไวและท้าทายขึ้นมาก!)
         const itemPool = [
-            { type: "apple", name: "แอปเปิ้ล", color: "#ff3333", points: 1, speed: 6 },
-            { type: "banana", name: "กล้วย", color: "#ffcc00", points: 1, speed: 5 },
-            { type: "orange", name: "ส้ม", color: "#ff6600", points: 1, speed: 5.5 },
-            { type: "grape", name: "องุ่น", color: "#993399", points: 2, speed: 6.5 }, // คะแนน x2
-            { type: "blueberry", name: "บลูเบอร์รี่", color: "#3333cc", points: 2, speed: 7 }, // คะแนน x2 ไวขึ้น
-            { type: "strawberry", name: "สตรอว์เบอร์รี่", color: "#ff4d6d", points: 3, speed: 8 }, // คะแนน x3 ตกไวมาก!
-            { type: "watermelon", name: "แตงโม", color: "#2b9348", points: 1, speed: 4.5 }, // ลูกใหญ่ ตกช้า
-            
-            // อุปสรรค
-            { type: "rock", name: "ก้อนหิน", color: "#888888", points: -1, speed: 7 },
-            { type: "bomb", name: "ระเบิด", color: "#111111", points: -3, speed: 8.5 }
+            { type: "apple", points: 1, baseSpeed: 11 },
+            { type: "banana", points: 1, baseSpeed: 10 },
+            { type: "orange", points: 1, baseSpeed: 10.5 },
+            { type: "rock", points: -1, baseSpeed: 13 },
+            { type: "bomb", points: -3, baseSpeed: 14 }
         ];
 
         function spawnNewItem() {
             const randomTemplate = itemPool[Math.floor(Math.random() * itemPool.length)];
-            
-            // ปรับขนาดของแตงโมให้ใหญ่ขึ้นเป็นพิเศษ ถ้าสุ่มเจอ
-            let currentItemSize = itemSize;
-            if (randomTemplate.type === "watermelon") currentItemSize = 75;
-            if (randomTemplate.type === "blueberry") currentItemSize = 35; // บลูเบอร์รี่ลูกเล็ก
-
             currentItem = {
                 type: randomTemplate.type,
-                color: randomTemplate.color,
                 points: randomTemplate.points,
-                size: currentItemSize,
-                speed: randomTemplate.speed + (Math.random() * 3), 
+                speed: randomTemplate.baseSpeed + (Math.random() * 4), // เพิ่มความสุ่มความเร็วให้เร้าใจ
                 x: Math.random() * (canvasElement.width - 200) + 100,
                 y: -50
             };
@@ -206,7 +192,7 @@
         hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
-            minDetectionConfidence: 0.4, // ลดลงนิดนึงเพื่อให้จับมือได้ง่ายและไวขึ้น
+            minDetectionConfidence: 0.4,
             minTrackingConfidence: 0.4
         });
 
@@ -224,26 +210,25 @@
                 canvasCtx.restore();
             } catch(e) {}
 
-            // 🔄 แก้บั๊กทิศทางสวนกัน: เปลี่ยนจาก (1 - wrist.x) เป็น wrist.x ตรงๆ เพื่อให้ทิศทางตรงกับหน้าจอที่กลับด้าน
+            // ดักจับข้อมือ ทิศทางตรงกับมือขยับจริง
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
                 const wrist = landmarks[0]; 
                 targetBasketX = wrist.x * canvasElement.width;
             }
 
-            // ⚡ เร่งความเร็วการขยับของตะกร้า (Lerp Speed เพิ่มจากเดิม เพื่อความลื่นไหลและไวขึ้นมาก)
-            // ตะกร้าจะวิ่งตามมือด้วยความเร็วสูงขึ้น ไม่หน่วง
-            basketX += (targetBasketX - basketX) * 0.4; 
+            // ตะกร้าขยับตามไวขึ้น
+            basketX += (targetBasketX - basketX) * 0.45; 
 
             // คำนวณเกมและระบบฟิสิกส์
             if (isPlaying && currentItem) {
                 currentItem.y += currentItem.speed;
 
                 // ตรวจสอบการชน (เก็บของใส่ตะกร้า)
-                if (currentItem.y >= basketY - 30 && currentItem.y <= basketY + 30) {
+                if (currentItem.y >= basketY - 35 && currentItem.y <= basketY + 35) {
                     if (Math.abs(currentItem.x - basketX) < basketWidth / 2) {
                         score += currentItem.points;
-                        score = Math.max(0, score); // คะแนนไม่ติดลบต่ำกว่า 0
+                        score = Math.max(0, score); 
                         scoreTxt.innerText = "คะแนน: " + score;
                         spawnNewItem();
                     }
@@ -308,29 +293,123 @@
             statusTxt.innerText = `จบเกม! คุณได้คะแนนทั้งหมด ${score} คะแนน 🌟`;
         }
 
+        // 🖌️ ฟังก์ชันวาดรูปทรงผลไม้และไอเทมแบบแยกประเภทชัดเจน (Custom Vector Shape)
+        function drawItemShape(ctx, x, y, type) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (type === "apple") {
+                // วาดผลแอปเปิ้ล (ทรงกลมคู่ซ้ายขวา)
+                ctx.beginPath();
+                ctx.arc(-10, 0, 18, 0, Math.PI * 2);
+                ctx.arc(10, 0, 18, 0, Math.PI * 2);
+                ctx.fillStyle = "#e63946";
+                ctx.fill();
+                // ส่วนล่างหยักก้นแอปเปิ้ล
+                ctx.beginPath();
+                ctx.arc(0, 12, 10, 0, Math.PI);
+                ctx.fillStyle = "#e63946";
+                ctx.fill();
+                // ก้าน
+                ctx.beginPath();
+                ctx.quadraticCurveTo(0, -15, 5, -25);
+                ctx.strokeStyle = "#4a2c11";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                // ใบไม้
+                ctx.beginPath();
+                ctx.ellipse(6, -23, 8, 4, Math.PI / 4, 0, Math.PI * 2);
+                ctx.fillStyle = "#4ad66d";
+                ctx.fill();
+
+            } else if (type === "banana") {
+                // วาดกล้วยเสี้ยวพระจันทร์โค้ง
+                ctx.beginPath();
+                ctx.arc(0, -5, 22, 0.2 * Math.PI, 0.9 * Math.PI, false);
+                ctx.quadraticCurveTo(0, 28, -20, 5);
+                ctx.fillStyle = "#ffde4d";
+                ctx.fill();
+                // ขั้วกล้วยสีเขียวเข้ม/น้ำตาล
+                ctx.beginPath();
+                ctx.rect(15, 5, 5, 6);
+                ctx.fillStyle = "#5c6b1a";
+                ctx.fill();
+
+            } else if (type === "orange") {
+                // วาดผลส้มทรงกลมสมบูรณ์
+                ctx.beginPath();
+                ctx.arc(0, 0, 20, 0, Math.PI * 2);
+                ctx.fillStyle = "#f77f00";
+                ctx.fill();
+                // จุดผิวส้มเล็กๆ
+                ctx.fillStyle = "#d66800";
+                ctx.fillRect(-6, -6, 2, 2);
+                ctx.fillRect(6, 4, 2, 2);
+                ctx.fillRect(-4, 6, 2, 2);
+                // ใบไม้ส้ม
+                ctx.beginPath();
+                ctx.ellipse(0, -20, 10, 5, -Math.PI / 6, 0, Math.PI * 2);
+                ctx.fillStyle = "#2a9d8f";
+                ctx.fill();
+
+            } else if (type === "rock") {
+                // วาดก้อนหินเหลี่ยมเหลี่ยมสี่เหลี่ยมคางหมู
+                ctx.beginPath();
+                ctx.moveTo(-18, 15);
+                ctx.lineTo(-12, -15);
+                ctx.lineTo(12, -12);
+                ctx.lineTo(20, 12);
+                ctx.lineTo(0, 18);
+                ctx.closePath();
+                ctx.fillStyle = "#7f8c8d";
+                ctx.fill();
+                // เส้นแรเงาเพิ่มความเหลี่ยม
+                ctx.beginPath();
+                ctx.moveTo(-12, -15);
+                ctx.lineTo(0, 2);
+                ctx.lineTo(20, 12);
+                ctx.strokeStyle = "#95a5a6";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+            } else if (type === "bomb") {
+                // วาดลูกระเบิดสีดำสนิท
+                ctx.beginPath();
+                ctx.arc(0, 4, 18, 0, Math.PI * 2);
+                ctx.fillStyle = "#212529";
+                ctx.fill();
+                // ชนวนเหล็กขั้วบน
+                ctx.fillStyle = "#6c757d";
+                ctx.fillRect(-5, -18, 10, 5);
+                // ชนวนเชือกสีขาวโค้ง
+                ctx.beginPath();
+                ctx.quadraticCurveTo(0, -22, 12, -28);
+                ctx.strokeStyle = "#e9ecef";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // ประกายไฟสีส้มแดงปลายชนวน
+                ctx.beginPath();
+                ctx.arc(12, -28, 5, 0, Math.PI * 2);
+                ctx.fillStyle = "#ff5722";
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(12, -28, 2, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffeb3b";
+                ctx.fill();
+            }
+
+            ctx.restore();
+        }
+
         function drawGameScene() {
             canvasCtx.save();
 
-            // 1. วาดไอเทมผลไม้หรือสิ่งกีดขวางตามสีและขนาดที่สุ่มได้
+            // 1. เรียกฟังก์ชันวาดผลไม้ตามชนิด
             if (isPlaying && currentItem) {
-                canvasCtx.beginPath();
-                canvasCtx.arc(currentItem.x, currentItem.y, currentItem.size / 2, 0, 2 * Math.PI);
-                canvasCtx.fillStyle = currentItem.color;
-                canvasCtx.fill();
-                canvasCtx.lineWidth = 3;
-                canvasCtx.strokeStyle = "#ffffff";
-                canvasCtx.stroke();
-                
-                // วาดก้าน/รายละเอียด
-                canvasCtx.beginPath();
-                canvasCtx.moveTo(currentItem.x, currentItem.y - (currentItem.size/2));
-                canvasCtx.lineTo(currentItem.x + 4, currentItem.y - (currentItem.size/2) - 8);
-                canvasCtx.strokeStyle = currentItem.type === "bomb" ? "#ff3333" : "#553311"; // ชนวนระเบิดเป็นสีแดง
-                canvasCtx.lineWidth = 3;
-                canvasCtx.stroke();
+                drawItemShape(canvasCtx, currentItem.x, currentItem.y, currentItem.type);
             }
 
-            // 2. วาดตะกร้าเก็บของ
+            // 2. วาดตะกร้าเก็บของเหมือนเดิม
             canvasCtx.beginPath();
             canvasCtx.arc(basketX, basketY, basketWidth / 2, 0, Math.PI, false);
             canvasCtx.lineTo(basketX - basketWidth/2, basketY);
@@ -340,7 +419,6 @@
             canvasCtx.strokeStyle = "#5c3a1a";
             canvasCtx.stroke();
 
-            // ขอบบนตะกร้า
             canvasCtx.beginPath();
             canvasCtx.ellipse(basketX, basketY, basketWidth / 2, 10, 0, 0, 2 * Math.PI);
             canvasCtx.fillStyle = "#A0522D";

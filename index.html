@@ -151,32 +151,47 @@
         let timerInterval;
 
         let basketX = 0;
+        let targetBasketX = 0; // ตำแหน่งเป้าหมายที่มือสั่ง
         let basketY = 0;
         const basketWidth = 160;
         const basketHeight = 70;
 
         let currentItem = null; 
-        const itemSize = 50; // ขนาดรัศมีของไอเทมทรงกลม
+        const itemSize = 50; 
 
-        // ดึงรูปพื้นหลังธรรมชาติแบบเบลอป้องกันบั๊ก CORS
+        // รูปพื้นหลังธรรมชาติ
         const imgBackground = new Image();
         imgBackground.crossOrigin = "anonymous";
         imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=1000';
 
-        // บล็อกสระไอเทมในเกม
+        // 🍎 คลังไอเทมใหม่ (มีผลไม้ 7 ชนิด + อุปสรรค 2 ชนิด)
         const itemPool = [
-            { type: "apple", color: "#ff3333", isFruit: true, speed: 6 },
-            { type: "banana", color: "#ffcc00", isFruit: true, speed: 5 },
-            { type: "rock", color: "#888888", isFruit: false, speed: 7 },
-            { type: "bomb", color: "#333333", isFruit: false, speed: 8 }
+            { type: "apple", name: "แอปเปิ้ล", color: "#ff3333", points: 1, speed: 6 },
+            { type: "banana", name: "กล้วย", color: "#ffcc00", points: 1, speed: 5 },
+            { type: "orange", name: "ส้ม", color: "#ff6600", points: 1, speed: 5.5 },
+            { type: "grape", name: "องุ่น", color: "#993399", points: 2, speed: 6.5 }, // คะแนน x2
+            { type: "blueberry", name: "บลูเบอร์รี่", color: "#3333cc", points: 2, speed: 7 }, // คะแนน x2 ไวขึ้น
+            { type: "strawberry", name: "สตรอว์เบอร์รี่", color: "#ff4d6d", points: 3, speed: 8 }, // คะแนน x3 ตกไวมาก!
+            { type: "watermelon", name: "แตงโม", color: "#2b9348", points: 1, speed: 4.5 }, // ลูกใหญ่ ตกช้า
+            
+            // อุปสรรค
+            { type: "rock", name: "ก้อนหิน", color: "#888888", points: -1, speed: 7 },
+            { type: "bomb", name: "ระเบิด", color: "#111111", points: -3, speed: 8.5 }
         ];
 
         function spawnNewItem() {
             const randomTemplate = itemPool[Math.floor(Math.random() * itemPool.length)];
+            
+            // ปรับขนาดของแตงโมให้ใหญ่ขึ้นเป็นพิเศษ ถ้าสุ่มเจอ
+            let currentItemSize = itemSize;
+            if (randomTemplate.type === "watermelon") currentItemSize = 75;
+            if (randomTemplate.type === "blueberry") currentItemSize = 35; // บลูเบอร์รี่ลูกเล็ก
+
             currentItem = {
                 type: randomTemplate.type,
                 color: randomTemplate.color,
-                isFruit: randomTemplate.isFruit,
+                points: randomTemplate.points,
+                size: currentItemSize,
                 speed: randomTemplate.speed + (Math.random() * 3), 
                 x: Math.random() * (canvasElement.width - 200) + 100,
                 y: -50
@@ -191,8 +206,8 @@
         hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
-            minDetectionConfidence: 0.5,
-            minTrackingConfidence: 0.5
+            minDetectionConfidence: 0.4, // ลดลงนิดนึงเพื่อให้จับมือได้ง่ายและไวขึ้น
+            minTrackingConfidence: 0.4
         });
 
         hands.onResults((results) => {
@@ -207,14 +222,18 @@
                 canvasCtx.globalAlpha = 0.4;
                 canvasCtx.drawImage(imgBackground, 0, 0, canvasElement.width, canvasElement.height);
                 canvasCtx.restore();
-            } catch(e) { /* บายพาสถ้าเกิดเออเรอร์พื้นหลัง */ }
+            } catch(e) {}
 
-            // คำนวณตำแหน่งมือควบคุมข้อมือ
+            // 🔄 แก้บั๊กทิศทางสวนกัน: เปลี่ยนจาก (1 - wrist.x) เป็น wrist.x ตรงๆ เพื่อให้ทิศทางตรงกับหน้าจอที่กลับด้าน
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
-                const wrist = landmarks[0];
-                basketX = (1 - wrist.x) * canvasElement.width;
+                const wrist = landmarks[0]; 
+                targetBasketX = wrist.x * canvasElement.width;
             }
+
+            // ⚡ เร่งความเร็วการขยับของตะกร้า (Lerp Speed เพิ่มจากเดิม เพื่อความลื่นไหลและไวขึ้นมาก)
+            // ตะกร้าจะวิ่งตามมือด้วยความเร็วสูงขึ้น ไม่หน่วง
+            basketX += (targetBasketX - basketX) * 0.4; 
 
             // คำนวณเกมและระบบฟิสิกส์
             if (isPlaying && currentItem) {
@@ -223,11 +242,8 @@
                 // ตรวจสอบการชน (เก็บของใส่ตะกร้า)
                 if (currentItem.y >= basketY - 30 && currentItem.y <= basketY + 30) {
                     if (Math.abs(currentItem.x - basketX) < basketWidth / 2) {
-                        if (currentItem.isFruit) {
-                            score += 1;
-                        } else {
-                            score = Math.max(0, score - 1);
-                        }
+                        score += currentItem.points;
+                        score = Math.max(0, score); // คะแนนไม่ติดลบต่ำกว่า 0
                         scoreTxt.innerText = "คะแนน: " + score;
                         spawnNewItem();
                     }
@@ -238,7 +254,7 @@
                 }
             }
 
-            // วาดองค์ประกอบเกมด้วยรูปทรงกราฟิกแทนรูปภาพ
+            // วาดองค์ประกอบเกม
             drawGameScene();
         });
 
@@ -258,6 +274,7 @@
             canvasElement.height = video.videoHeight || 720;
             basketY = canvasElement.height - 120;
             basketX = canvasElement.width / 2;
+            targetBasketX = canvasElement.width / 2;
             spawnNewItem();
         });
 
@@ -291,40 +308,39 @@
             statusTxt.innerText = `จบเกม! คุณได้คะแนนทั้งหมด ${score} คะแนน 🌟`;
         }
 
-        // ฟังก์ชันวาดรูปทรงตะกร้าและผลไม้ด้วย Code กราฟิกโดยตรง
         function drawGameScene() {
             canvasCtx.save();
 
-            // 1. วาดของที่ตกลงมา
+            // 1. วาดไอเทมผลไม้หรือสิ่งกีดขวางตามสีและขนาดที่สุ่มได้
             if (isPlaying && currentItem) {
                 canvasCtx.beginPath();
-                canvasCtx.arc(currentItem.x, currentItem.y, itemSize / 2, 0, 2 * Math.PI);
+                canvasCtx.arc(currentItem.x, currentItem.y, currentItem.size / 2, 0, 2 * Math.PI);
                 canvasCtx.fillStyle = currentItem.color;
                 canvasCtx.fill();
                 canvasCtx.lineWidth = 3;
                 canvasCtx.strokeStyle = "#ffffff";
                 canvasCtx.stroke();
                 
-                // วาดรายละเอียดของขั้วผลไม้หรือชนวนระเบิดให้ดูรู้เรื่อง
+                // วาดก้าน/รายละเอียด
                 canvasCtx.beginPath();
-                canvasCtx.moveTo(currentItem.x, currentItem.y - (itemSize/2));
-                canvasCtx.lineTo(currentItem.x + 5, currentItem.y - (itemSize/2) - 10);
-                canvasCtx.strokeStyle = "#553311";
-                canvasCtx.lineWidth = 4;
+                canvasCtx.moveTo(currentItem.x, currentItem.y - (currentItem.size/2));
+                canvasCtx.lineTo(currentItem.x + 4, currentItem.y - (currentItem.size/2) - 8);
+                canvasCtx.strokeStyle = currentItem.type === "bomb" ? "#ff3333" : "#553311"; // ชนวนระเบิดเป็นสีแดง
+                canvasCtx.lineWidth = 3;
                 canvasCtx.stroke();
             }
 
-            // 2. วาดตะกร้าเก็บของ (ครึ่งวงกลมหงายสีน้ำตาลไม้)
+            // 2. วาดตะกร้าเก็บของ
             canvasCtx.beginPath();
             canvasCtx.arc(basketX, basketY, basketWidth / 2, 0, Math.PI, false);
             canvasCtx.lineTo(basketX - basketWidth/2, basketY);
-            canvasCtx.fillStyle = "#8B5A2B"; // สีน้ำตาลไม้ตะกร้า
+            canvasCtx.fillStyle = "#8B5A2B"; 
             canvasCtx.fill();
             canvasCtx.lineWidth = 5;
             canvasCtx.strokeStyle = "#5c3a1a";
             canvasCtx.stroke();
 
-            // วาดขอบบนตะกร้า
+            // ขอบบนตะกร้า
             canvasCtx.beginPath();
             canvasCtx.ellipse(basketX, basketY, basketWidth / 2, 10, 0, 0, 2 * Math.PI);
             canvasCtx.fillStyle = "#A0522D";

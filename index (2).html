@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ล้างหมี AR 🧸</title>
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+
+<!-- MediaPipe Hands -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+
+<style>
+  :root{
+    /* ===== ธีมปกติ / กำลังเล่น (สดใส ฟ้า-ชมพู) ===== */
+    --bg-1: #bfeaf7;
+    --bg-2: #ffd3ea;
+    --card: #ffffff;
+    --ink: #4a3f4d;
+    --accent: #ff8fc0;
+    --accent-2: #7fd9f0;
+    --bear-body: #d9b48a;
+    --bear-muzzle: #f6e3c5;
+    --bear-blush: #ffb3c6;
+    --spot: #8a6a4a;
+
+    /* ===== ธีมล้มเหลว (อึมครึม) ===== */
+    --bg-1-fail: #4b4d63;
+    --bg-2-fail: #2c2c3d;
+    --accent-fail: #8f8fae;
+
+    --transition-slow: 0.9s ease;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    font-family:'Nunito', sans-serif;
+    color:var(--ink);
+  }
+
+  body{
+    background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    transition: background var(--transition-slow);
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  body.fail-theme{
+    background: linear-gradient(160deg, var(--bg-1-fail), var(--bg-2-fail));
+  }
+
+  #game-wrap{
+    position:relative;
+    width:min(100vw, 720px);
+    height:min(100vh, 960px);
+    border-radius:28px;
+    overflow:hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.18);
+    background:#000;
+  }
+
+  /* กล้อง (ถูกซ่อน ใช้เป็นแหล่งภาพ) */
+  #input-video{
+    display:none;
+  }
+
+  /* แคนวาสหลัก: วาดภาพจากกล้อง + ตุ๊กตาหมี + คราบสกปรก + มือ */
+  #output-canvas{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    transform: scaleX(-1); /* กลับด้านให้เหมือนกระจก */
+  }
+
+  /* ===== UI ด้านบน ===== */
+  #hud{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; justify-content:space-between; align-items:center;
+    padding:16px 20px;
+    z-index:5;
+    pointer-events:none;
+  }
+
+  .pill{
+    background: rgba(255,255,255,0.85);
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-family:'Baloo 2', sans-serif;
+    font-weight:700;
+    font-size: 15px;
+    color: var(--ink);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  }
+
+  #timer-pill{ min-width:90px; text-align:center; }
+  #progress-pill{ min-width:120px; text-align:center; }
+
+  /* ===== ข้อความผลลัพธ์ ===== */
+  #result-overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px;
+    background: rgba(0,0,0,0);
+    opacity:0; pointer-events:none;
+    transition: opacity 0.5s ease, background 0.5s ease;
+    z-index:10;
+  }
+
+  #result-overlay.show{
+    opacity:1; pointer-events:all;
+    background: rgba(20,15,25,0.35);
+  }
+
+  #result-title{
+    font-family:'Baloo 2', sans-serif;
+    font-weight:800;
+    font-size: 44px;
+    padding: 10px 30px;
+    border-radius: 24px;
+    background: var(--card);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+
+  #result-title.success{ color:#3aa66b; }
+  #result-title.fail{ color:#7a5c8c; }
+
+  #retry-btn{
+    font-family:'Baloo 2', sans-serif;
+    font-weight:700;
+    font-size:18px;
+    border:none;
+    border-radius:999px;
+    padding:12px 30px;
+    background: var(--accent);
+    color:white;
+    cursor:pointer;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+  }
+
+  #retry-btn:active{ transform: translateY(1px); }
+
+  #start-overlay{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px;
+    background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    z-index:20;
+    text-align:center;
+    padding: 30px;
+  }
+
+  #start-overlay h1{
+    font-family:'Baloo 2', sans-serif;
+    font-size: 30px;
+    margin:0;
+  }
+
+  #start-overlay p{
+    max-width: 320px;
+    line-height:1.5;
+    margin:0;
+  }
+
+  #start-btn{
+    font-family:'Baloo 2', sans-serif;
+    font-weight:800;
+    font-size:20px;
+    border:none;
+    border-radius:999px;
+    padding:14px 36px;
+    background: var(--accent-2);
+    color:white;
+    cursor:pointer;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+  }
+</style>
+</head>
+<body>
+
+<div id="game-wrap">
+
+  <video id="input-video" playsinline></video>
+  <canvas id="output-canvas"></canvas>
+
+  <div id="hud">
+    <div id="progress-pill" class="pill">สะอาด 0%</div>
+    <div id="timer-pill" class="pill">⏱ 20</div>
+  </div>
+
+  <div id="result-overlay">
+    <div id="result-title">สำเร็จ!</div>
+    <button id="retry-btn">เล่นอีกครั้ง</button>
+  </div>
+
+  <div id="start-overlay">
+    <h1>🧸 ล้างหมีให้สะอาด</h1>
+    <p>ใช้ปลายนิ้วชี้ของคุณถูตรงคราบสกปรกบนตัวหมีให้หมดก่อนเวลาจะหมด!</p>
+    <button id="start-btn">เริ่มเล่น</button>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   ค่าคงที่ / การตั้งค่าเกม
+   ========================================================= */
+const GAME_CONFIG = {
+  timeLimitSeconds: 20,     // เวลาที่ให้ล้างหมี
+  cleanRadius: 60,          // รัศมี (px, บนแคนวาส) ที่นิ้วจะเช็ดโดนคราบ
+  cleanSpeed: 1.8,          // % ความสะอาดต่อเฟรมที่นิ้วอยู่ในคราบ
+  bear: {
+    // ตำแหน่งกึ่งกลางลำตัวหมี เป็นสัดส่วน 0-1 ของแคนวาส (จะคำนวณใหม่ตอน resize)
+    centerXRatio: 0.5,
+    centerYRatio: 0.55,
+    bodyRadiusRatio: 0.24
+  },
+  // คราบสกปรกบนตัวหมี ตำแหน่งเป็น offset จากจุดกึ่งกลางหมี (สัดส่วนของ bodyRadius)
+  dirtySpots: [
+    { dx: -0.35, dy: -0.15, r: 0.16 },
+    { dx:  0.30, dy: -0.05, r: 0.18 },
+    { dx: -0.05, dy:  0.35, r: 0.20 },
+    { dx:  0.35, dy:  0.30, r: 0.15 }
+  ]
+};
+
+/* =========================================================
+   สถานะเกม (state machine): IDLE -> PLAYING -> SUCCESS / FAIL
+   ========================================================= */
+const GameState = { IDLE: 'idle', PLAYING: 'playing', SUCCESS: 'success', FAIL: 'fail' };
+
+const state = {
+  current: GameState.IDLE,
+  spots: [],              // จะถูกสร้างใหม่ทุกครั้งที่เริ่มเกม {x,y,r,clean(0-100)}
+  timeLeft: GAME_CONFIG.timeLimitSeconds,
+  timerHandle: null,
+  fingerTip: null,        // {x,y} ตำแหน่งปลายนิ้วชี้ล่าสุดบนแคนวาส (พิกัดจริง ไม่ mirror)
+};
+
+/* =========================================================
+   DOM references
+   ========================================================= */
+const videoEl = document.getElementById('input-video');
+const canvasEl = document.getElementById('output-canvas');
+const ctx = canvasEl.getContext('2d');
+
+const progressPill = document.getElementById('progress-pill');
+const timerPill = document.getElementById('timer-pill');
+const resultOverlay = document.getElementById('result-overlay');
+const resultTitle = document.getElementById('result-title');
+const retryBtn = document.getElementById('retry-btn');
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
+
+/* =========================================================
+   ปรับขนาดแคนวาสให้พอดีกล่องเกม
+   ========================================================= */
+function resizeCanvas() {
+  const wrap = document.getElementById('game-wrap');
+  canvasEl.width = wrap.clientWidth;
+  canvasEl.height = wrap.clientHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+
+/* =========================================================
+   สร้างคราบสกปรกใหม่ตามตำแหน่งหมีปัจจุบัน
+   ========================================================= */
+function createDirtySpots() {
+  const cx = canvasEl.width * GAME_CONFIG.bear.centerXRatio;
+  const cy = canvasEl.height * GAME_CONFIG.bear.centerYRatio;
+  const bodyR = Math.min(canvasEl.width, canvasEl.height) * GAME_CONFIG.bear.bodyRadiusRatio;
+
+  state.spots = GAME_CONFIG.dirtySpots.map(cfg => ({
+    x: cx + cfg.dx * bodyR * 2,
+    y: cy + cfg.dy * bodyR * 2,
+    r: cfg.r * bodyR * 2,
+    clean: 0 // 0 = สกปรกเต็มที่, 100 = สะอาด
+  }));
+}
+
+/* =========================================================
+   วาดตุ๊กตาหมี (โครงร่างเรขาคณิตง่าย ๆ)
+   mood: 'happy' | 'sad' | 'neutral'
+   ========================================================= */
+function drawBear(mood) {
+  const cx = canvasEl.width * GAME_CONFIG.bear.centerXRatio;
+  const cy = canvasEl.height * GAME_CONFIG.bear.centerYRatio;
+  const bodyR = Math.min(canvasEl.width, canvasEl.height) * GAME_CONFIG.bear.bodyRadiusRatio;
+
+  const bodyColor = getComputedStyle(document.body).getPropertyValue('--bear-body').trim();
+  const muzzleColor = getComputedStyle(document.body).getPropertyValue('--bear-muzzle').trim();
+  const blushColor = getComputedStyle(document.body).getPropertyValue('--bear-blush').trim();
+
+  ctx.save();
+
+  // หู
+  ctx.fillStyle = bodyColor;
+  ctx.beginPath();
+  ctx.arc(cx - bodyR * 0.75, cy - bodyR * 0.85, bodyR * 0.32, 0, Math.PI * 2);
+  ctx.arc(cx + bodyR * 0.75, cy - bodyR * 0.85, bodyR * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+
+  // หัว
+  ctx.beginPath();
+  ctx.arc(cx, cy, bodyR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ปาก (muzzle)
+  ctx.fillStyle = muzzleColor;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + bodyR * 0.25, bodyR * 0.55, bodyR * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // แก้มปัดแดง
+  ctx.fillStyle = blushColor;
+  ctx.globalAlpha = 0.7;
+  ctx.beginPath();
+  ctx.ellipse(cx - bodyR * 0.55, cy + bodyR * 0.15, bodyR * 0.14, bodyR * 0.09, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx + bodyR * 0.55, cy + bodyR * 0.15, bodyR * 0.14, bodyR * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // จมูก
+  ctx.fillStyle = '#5a4632';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + bodyR * 0.05, bodyR * 0.13, bodyR * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ตา + ปาก ตามอารมณ์
+  ctx.strokeStyle = '#4a3520';
+  ctx.fillStyle = '#4a3520';
+  ctx.lineWidth = bodyR * 0.045;
+  ctx.lineCap = 'round';
+
+  const eyeY = cy - bodyR * 0.12;
+  const eyeDX = bodyR * 0.32;
+
+  if (mood === 'sad') {
+    // ตาโค้งลง (หรี่)
+    ctx.beginPath();
+    ctx.arc(cx - eyeDX, eyeY, bodyR * 0.07, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx + eyeDX, eyeY, bodyR * 0.07, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+
+    // ปากบึ้ง (โค้งคว่ำ)
+    ctx.beginPath();
+    ctx.arc(cx, cy + bodyR * 0.55, bodyR * 0.22, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  } else {
+    // ตากลมปกติ / ยิ้ม
+    ctx.beginPath();
+    ctx.arc(cx - eyeDX, eyeY, bodyR * 0.06, 0, Math.PI * 2);
+    ctx.arc(cx + eyeDX, eyeY, bodyR * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+
+    // ปากยิ้ม (โค้งหงาย)
+    ctx.beginPath();
+    ctx.arc(cx, cy + bodyR * 0.35, bodyR * 0.22, Math.PI * 0.15, Math.PI * 0.85);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/* =========================================================
+   วาดคราบสกปรกที่ยังไม่สะอาด (ความโปร่งใสลดลงตามค่า clean)
+   ========================================================= */
+function drawDirtySpots() {
+  const spotColor = getComputedStyle(document.body).getPropertyValue('--spot').trim();
+  state.spots.forEach(spot => {
+    const remaining = 1 - (spot.clean / 100);
+    if (remaining <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = 0.55 * remaining;
+    ctx.fillStyle = spotColor;
+    ctx.beginPath();
+    ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+}
+
+/* =========================================================
+   วาดตำแหน่งปลายนิ้ว (เอฟเฟกต์ฟองสบู่น่ารัก ๆ)
+   ========================================================= */
+function drawFingerCursor() {
+  if (!state.fingerTip) return;
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent').trim();
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(state.fingerTip.x, state.fingerTip.y, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* =========================================================
+   คำนวณเปอร์เซ็นต์ความสะอาดรวม
+   ========================================================= */
+function getOverallCleanPercent() {
+  if (state.spots.length === 0) return 0;
+  const total = state.spots.reduce((sum, s) => sum + s.clean, 0);
+  return Math.round(total / state.spots.length);
+}
+
+/* =========================================================
+   อัปเดตความสะอาดของคราบเมื่อปลายนิ้วอยู่ใกล้
+   ========================================================= */
+function updateCleaning() {
+  if (!state.fingerTip || state.current !== GameState.PLAYING) return;
+
+  state.spots.forEach(spot => {
+    if (spot.clean >= 100) return;
+    const dist = Math.hypot(state.fingerTip.x - spot.x, state.fingerTip.y - spot.y);
+    if (dist < GAME_CONFIG.cleanRadius) {
+      spot.clean = Math.min(100, spot.clean + GAME_CONFIG.cleanSpeed);
+    }
+  });
+
+  progressPill.textContent = `สะอาด ${getOverallCleanPercent()}%`;
+
+  if (state.spots.every(s => s.clean >= 100)) {
+    endGame(true);
+  }
+}
+
+/* =========================================================
+   MediaPipe Hands: ตั้งค่าและ callback ผลลัพธ์
+   ========================================================= */
+const hands = new Hands({
+  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands: 1,
+  modelComplexity: 1,
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
+});
+
+hands.onResults(onHandResults);
+
+function onHandResults(results) {
+  // 1) วาดภาพจากกล้องเป็นพื้นหลังของแคนวาสก่อน
+  ctx.save();
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  ctx.drawImage(results.image, 0, 0, canvasEl.width, canvasEl.height);
+  ctx.restore();
+
+  // 2) อ่านตำแหน่งปลายนิ้วชี้ (landmark index 8) ถ้าเจอมือ
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const indexTip = results.multiHandLandmarks[0][8];
+    state.fingerTip = {
+      x: indexTip.x * canvasEl.width,
+      y: indexTip.y * canvasEl.height
+    };
+  } else {
+    state.fingerTip = null;
+  }
+
+  // 3) อัปเดตตรรกะเกม
+  updateCleaning();
+
+  // 4) วาดหมี + คราบสกปรก + เคอร์เซอร์นิ้ว ทับบนภาพกล้อง
+  const mood = state.current === GameState.FAIL ? 'sad' : 'neutral';
+  drawBear(mood);
+  drawDirtySpots();
+  drawFingerCursor();
+}
+
+/* =========================================================
+   ตัวจับเวลาการเล่น
+   ========================================================= */
+function startTimer() {
+  state.timeLeft = GAME_CONFIG.timeLimitSeconds;
+  timerPill.textContent = `⏱ ${state.timeLeft}`;
+
+  state.timerHandle = setInterval(() => {
+    state.timeLeft -= 1;
+    timerPill.textContent = `⏱ ${Math.max(0, state.timeLeft)}`;
+
+    if (state.timeLeft <= 0) {
+      endGame(false);
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (state.timerHandle) {
+    clearInterval(state.timerHandle);
+    state.timerHandle = null;
+  }
+}
+
+/* =========================================================
+   เริ่ม / จบเกม
+   ========================================================= */
+function startGame() {
+  startOverlay.style.display = 'none';
+  resultOverlay.classList.remove('show');
+  document.body.classList.remove('fail-theme');
+
+  resizeCanvas();
+  createDirtySpots();
+
+  state.current = GameState.PLAYING;
+  progressPill.textContent = 'สะอาด 0%';
+
+  startTimer();
+}
+
+function endGame(success) {
+  if (state.current !== GameState.PLAYING) return; // กันเรียกซ้ำ
+  stopTimer();
+  state.current = success ? GameState.SUCCESS : GameState.FAIL;
+
+  if (success) {
+    resultTitle.textContent = '🎉 สำเร็จ! หมีสะอาดแล้ว';
+    resultTitle.className = 'success';
+  } else {
+    resultTitle.textContent = '😢 ไม่สำเร็จ ลองอีกครั้งนะ';
+    resultTitle.className = 'fail';
+    document.body.classList.add('fail-theme');
+  }
+
+  resultOverlay.classList.add('show');
+}
+
+retryBtn.addEventListener('click', startGame);
+startBtn.addEventListener('click', startGame);
+
+/* =========================================================
+   เปิดกล้องด้วย CameraUtils แล้วส่งเฟรมให้ MediaPipe Hands
+   ========================================================= */
+async function setupCamera() {
+  resizeCanvas();
+
+  const camera = new Camera(videoEl, {
+    onFrame: async () => {
+      await hands.send({ image: videoEl });
+    },
+    width: 720,
+    height: 960
+  });
+
+  await camera.start();
+}
+
+setupCamera().catch(err => {
+  console.error('ไม่สามารถเปิดกล้องได้:', err);
+  startOverlay.querySelector('p').textContent =
+    'ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้กล้องแล้วโหลดหน้านี้ใหม่';
+});
+</script>
+</body>
+</html>

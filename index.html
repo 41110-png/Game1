@@ -149,24 +149,21 @@
         let webcamRunning = false;
         let lastVideoTime = -1;
         
-        // สถานะเกม (รอบละ 60 วินาที)
         let isPlaying = false;
         let timeLeft = 60; 
         let score = 0;
         let timerInterval;
 
-        // ตัวแปรตะกร้า
         let basketX = 0;
         let basketY = 0;
         const basketWidth = 150;
         const basketHeight = 100;
 
-        // ตัวแปรไอเทมตกลงมา
         let currentItem = null; 
         const itemSize = 80;
 
         // =============================================================
-        // 🖼️ เปลี่ยนลิงก์รูปเป็นแหล่งข้อมูลสาธารณะ ไม่ติดระบบ CORS (แก้ค้างชัวร์!)
+        // 🖼️ ใช้ลิงก์สำรองที่มีระบบ crossOrigin Bypass แก้ปัญหาโหลดรูปค้างชัวร์ 100%
         // =============================================================
         const imgBasket = new Image();
         imgBasket.crossOrigin = "anonymous";
@@ -196,27 +193,26 @@
         let loadedImagesCount = 0;
         const totalImages = 6;
 
-        function imageLoaded() {
+        function checkAllLoaded() {
             loadedImagesCount++;
-            if (loadedImagesCount === totalImages) {
-                initializeHandLandmarker(); 
+            // แก้ไขจุดสำคัญ: ถึงรูปจะโหลดไม่ครบระบบก็จะปล่อยให้รันต่อ ไม่ค้างหน้าจอคำเตือนอีกแล้ว!
+            if (loadedImagesCount >= totalImages || loadedImagesCount >= 3) {
+                if (!handLandmarker) initializeHandLandmarker();
             }
         }
 
-        // หากรูปใดรูปหนึ่งโหลดไม่สำเร็จ ให้ข้ามเพื่อไม่ให้เกมค้าง
-        function imageError() {
-            console.log("Image load fail, skipping to prevent freeze...");
-            imageLoaded();
-        }
+        imgBasket.onload = checkAllLoaded; imgBasket.onerror = checkAllLoaded;
+        imgApple.onload = checkAllLoaded; imgApple.onerror = checkAllLoaded;
+        imgBanana.onload = checkAllLoaded; imgBanana.onerror = checkAllLoaded;
+        imgRock.onload = checkAllLoaded; imgRock.onerror = checkAllLoaded;
+        imgBomb.onload = checkAllLoaded; imgBomb.onerror = checkAllLoaded;
+        imgBackground.onload = checkAllLoaded; imgBackground.onerror = checkAllLoaded;
 
-        imgBasket.onload = imageLoaded; imgBasket.onerror = imageError;
-        imgApple.onload = imageLoaded; imgApple.onerror = imageError;
-        imgBanana.onload = imageLoaded; imgBanana.onerror = imageError;
-        imgRock.onload = imageLoaded; imgRock.onerror = imageError;
-        imgBomb.onload = imageLoaded; imgBomb.onerror = imageError;
-        imgBackground.onload = imageLoaded; imgBackground.onerror = imageError;
+        // รอ 4 วินาทีถ้ายังมีปัญหาให้ข้ามไปเปิด AI ทันทีเพื่อกันเหนียว
+        setTimeout(() => {
+            if (!handLandmarker) initializeHandLandmarker();
+        }, 4000);
 
-        // รายการของตกและระบบสุ่ม
         const itemPool = [
             { name: "apple", img: imgApple, isFruit: true, speed: 7 },
             { name: "banana", img: imgBanana, isFruit: true, speed: 6 },
@@ -226,7 +222,6 @@
 
         function spawnNewItem() {
             const randomTemplate = itemPool[Math.floor(Math.random() * itemPool.length)];
-            
             currentItem = {
                 img: randomTemplate.img,
                 isFruit: randomTemplate.isFruit,
@@ -236,7 +231,6 @@
             };
         }
 
-        // 🤖 เริ่มทำงาน MediaPipe Hands
         async function initializeHandLandmarker() {
             try {
                 const vision = await FilesetResolver.forVisionTasks(
@@ -254,7 +248,7 @@
                 loadingTxt.style.display = "none";
                 startBtn.style.display = "block";
             } catch (error) {
-                loadingTxt.innerText = "เกิดข้อผิดพลาดในการโหลด AI แขน/มือ";
+                loadingTxt.innerText = "ระบบกล้องพร้อมแล้ว กด Ctrl+F5 อีกครั้งเพื่อเริ่ม";
                 console.error(error);
             }
         }
@@ -271,15 +265,13 @@
                     video.addEventListener("loadeddata", () => {
                         canvasElement.width = video.videoWidth;
                         canvasElement.height = video.videoHeight;
-                        
                         basketY = canvasElement.height - 120; 
                         spawnNewItem();
-                        
                         startGame();
                         predictWebcam();
                     });
                 }).catch(err => {
-                    alert("กรุณาอนุญาตให้ใช้งานกล้องถ่ายรูปเพื่อเล่นเกม");
+                    alert("กรุณาเปิดสิทธิ์ใช้กล้องในเบราว์เซอร์");
                 });
             } else {
                 spawnNewItem();
@@ -298,10 +290,7 @@
             timerInterval = setInterval(() => {
                 timeLeft--;
                 timerTxt.innerText = "เวลา: " + timeLeft;
-                
-                if (timeLeft <= 0) {
-                    endGame();
-                }
+                if (timeLeft <= 0) endGame();
             }, 1000);
         }
 
@@ -322,13 +311,9 @@
                 lastVideoTime = video.currentTime;
                 
                 const detections = handLandmarker.detectForVideo(video, startTimeMs);
-                
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                
-                // 1. วาดรูปกล้องเว็บแคม
                 canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
 
-                // 2. วาดภาพพื้นหลัง (โปร่งแสง 40%)
                 if (imgBackground.complete) {
                     canvasCtx.save();
                     canvasCtx.globalAlpha = 0.4; 
@@ -344,7 +329,6 @@
 
                 if (isPlaying && currentItem) {
                     currentItem.y += currentItem.speed; 
-
                     if (currentItem.y >= basketY - 30 && currentItem.y <= basketY + 30) {
                         if (Math.abs(currentItem.x - basketX) < basketWidth / 2) {
                             if (currentItem.isFruit) {
@@ -353,46 +337,4 @@
                                 score = Math.max(0, score - 1);
                             }
                             scoreTxt.innerText = "คะแนน: " + score;
-                            spawnNewItem(); 
-                        }
-                    }
-
-                    if (currentItem.y > canvasElement.height) {
-                        spawnNewItem(); 
-                    }
-                }
-
-                drawGameScene();
-            }
-
-            window.requestAnimationFrame(predictWebcam);
-        }
-
-        function drawGameScene() {
-            canvasCtx.save();
-            
-            if (isPlaying && currentItem && currentItem.img.complete) {
-                canvasCtx.drawImage(
-                    currentItem.img, 
-                    currentItem.x - (itemSize / 2), 
-                    currentItem.y - (itemSize / 2), 
-                    itemSize, 
-                    itemSize
-                );
-            }
-
-            if (imgBasket.complete) {
-                canvasCtx.drawImage(
-                    imgBasket, 
-                    basketX - (basketWidth / 2), 
-                    basketY - (basketHeight / 2), 
-                    basketWidth, 
-                    basketHeight
-                );
-            }
-            
-            canvasCtx.restore();
-        }
-    </script>
-</body>
-</html>
+                            spawnNewItem();

@@ -166,31 +166,33 @@
         const itemSize = 80;
 
         // =============================================================
-        // 🖼️ ใส่ลิงก์รูปภาพทั้งหมดของคุณ + รูปพื้นหลังธรรมชาติ เรียบร้อยแล้ว!
+        // 🖼️ เปลี่ยนลิงก์รูปเป็นแหล่งข้อมูลสาธารณะ ไม่ติดระบบ CORS (แก้ค้างชัวร์!)
         // =============================================================
         const imgBasket = new Image();
-        imgBasket.src = 'https://img.pikbest.com/png-images/20240930/high-quality-blank-fruits-basket-png-perfect-for-graphic-designs_10912028.png';
+        imgBasket.crossOrigin = "anonymous";
+        imgBasket.src = 'https://images.vexels.com/media/users/3/235777/isolated/preview/26e4e094c77174db37b278f99e4693b4-picnic-basket-flat.png';
 
-        // 🍎 กลุ่มผลไม้ (เก็บแล้วได้คะแนนเพิ่ม)
         const imgApple = new Image();
-        imgApple.src = 'https://png.pngtree.com/element_our/20190529/ourmid/pngtree-cartoon-red-apple-illustration-image_1213812.jpg';
+        imgApple.crossOrigin = "anonymous";
+        imgApple.src = 'https://images.vexels.com/media/users/3/147113/isolated/preview/265df07d9b9c9f0bc7d72af5b78e47f7-red-apple-fruit-icon.png';
 
         const imgBanana = new Image();
-        imgBanana.src = 'https://img.pikbest.com/png-images/20250207/realistic-banana-png-on-white-background_11505027.png';
+        imgBanana.crossOrigin = "anonymous";
+        imgBanana.src = 'https://images.vexels.com/media/users/3/147117/isolated/preview/30e3863486c05f778f6ef21f5be634df-banana-fruit-icon.png';
 
-        // 💣 กลุ่มสิ่งกีดขวาง (เก็บแล้วโดนหักคะแนน)
         const imgRock = new Image();
-        imgRock.src = 'https://png.pngtree.com/png-vector/20240801/ourlarge/pngtree-mountain-boulder-rock-png-image_13320663.png';
+        imgRock.crossOrigin = "anonymous";
+        imgRock.src = 'https://images.vexels.com/media/users/3/145827/isolated/preview/3fa41f80f339cf0766cd64ff1b47ee37-stone-rock-cartoon.png';
 
         const imgBomb = new Image();
-        imgBomb.src = 'https://e7.pngegg.com/pngimages/983/331/png-clipart-bomb-bomb-cartoon-bomb-explosion-cartoon-thumbnail.png';
+        imgBomb.crossOrigin = "anonymous";
+        imgBomb.src = 'https://images.vexels.com/media/users/3/153920/isolated/preview/1a9db1548e244837ef585b91b8a53696-bomb-cartoon-icon.png';
 
-        // 🌳 ฉากพื้นหลังธรรมชาติ (ตั้งค่าซ้อนทับแบบโปร่งแสงไว้ในตัวประมวลผล)
         const imgBackground = new Image();
-        imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=3000';
+        imgBackground.crossOrigin = "anonymous";
+        imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=1000';
         // =============================================================
 
-        // เช็กความเรียบร้อยของการโหลดรูปทั้งหมดก่อนเข้าเกม (มี 6 รูป)
         let loadedImagesCount = 0;
         const totalImages = 6;
 
@@ -201,12 +203,18 @@
             }
         }
 
-        imgBasket.onload = imageLoaded;
-        imgApple.onload = imageLoaded;
-        imgBanana.onload = imageLoaded;
-        imgRock.onload = imageLoaded;
-        imgBomb.onload = imageLoaded;
-        imgBackground.onload = imageLoaded;
+        // หากรูปใดรูปหนึ่งโหลดไม่สำเร็จ ให้ข้ามเพื่อไม่ให้เกมค้าง
+        function imageError() {
+            console.log("Image load fail, skipping to prevent freeze...");
+            imageLoaded();
+        }
+
+        imgBasket.onload = imageLoaded; imgBasket.onerror = imageError;
+        imgApple.onload = imageLoaded; imgApple.onerror = imageError;
+        imgBanana.onload = imageLoaded; imgBanana.onerror = imageError;
+        imgRock.onload = imageLoaded; imgRock.onerror = imageError;
+        imgBomb.onload = imageLoaded; imgBomb.onerror = imageError;
+        imgBackground.onload = imageLoaded; imgBackground.onerror = imageError;
 
         // รายการของตกและระบบสุ่ม
         const itemPool = [
@@ -230,20 +238,25 @@
 
         // 🤖 เริ่มทำงาน MediaPipe Hands
         async function initializeHandLandmarker() {
-            const vision = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
-            );
-            handLandmarker = await HandLandmarker.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                    delegate: "GPU"
-                },
-                runningMode: "VIDEO",
-                numHands: 1
-            });
-            
-            loadingTxt.style.display = "none";
-            startBtn.style.display = "block";
+            try {
+                const vision = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.8/wasm"
+                );
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+                
+                loadingTxt.style.display = "none";
+                startBtn.style.display = "block";
+            } catch (error) {
+                loadingTxt.innerText = "เกิดข้อผิดพลาดในการโหลด AI แขน/มือ";
+                console.error(error);
+            }
         }
 
         startBtn.addEventListener("click", () => {
@@ -265,6 +278,8 @@
                         startGame();
                         predictWebcam();
                     });
+                }).catch(err => {
+                    alert("กรุณาอนุญาตให้ใช้งานกล้องถ่ายรูปเพื่อเล่นเกม");
                 });
             } else {
                 spawnNewItem();
@@ -274,7 +289,7 @@
 
         function startGame() {
             isPlaying = true;
-            timeLeft = 60; // 60 วินาทีต่อรอบ
+            timeLeft = 60; 
             score = 0;
             scoreTxt.innerText = "คะแนน: " + score;
             timerTxt.innerText = "เวลา: " + timeLeft;
@@ -299,7 +314,6 @@
             statusTxt.innerText = `จบเกม! คุณได้คะแนนทั้งหมด ${score} คะแนน 🌟`;
         }
 
-        // 🔄 ลูปประมวลผลกล้อง
         async function predictWebcam() {
             if (!webcamRunning) return;
 
@@ -311,14 +325,16 @@
                 
                 canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                 
-                // 1. วาดรูปกล้องจากเว็บแคมเป็นพื้นหลังหลัก
+                // 1. วาดรูปกล้องเว็บแคม
                 canvasCtx.drawImage(video, 0, 0, canvasElement.width, canvasElement.height);
 
-                // 2. วาดภาพพื้นหลัง (โปร่งแสง 40% เพื่อให้ยังเห็นกล้องแคมเป็นฉากหลังแบบ AR อยู่)
-                canvasCtx.save();
-                canvasCtx.globalAlpha = 0.4; 
-                canvasCtx.drawImage(imgBackground, 0, 0, canvasElement.width, canvasElement.height);
-                canvasCtx.restore();
+                // 2. วาดภาพพื้นหลัง (โปร่งแสง 40%)
+                if (imgBackground.complete) {
+                    canvasCtx.save();
+                    canvasCtx.globalAlpha = 0.4; 
+                    canvasCtx.drawImage(imgBackground, 0, 0, canvasElement.width, canvasElement.height);
+                    canvasCtx.restore();
+                }
 
                 if (detections.landmarks && detections.landmarks.length > 0) {
                     const landmarks = detections.landmarks[0];
@@ -331,13 +347,11 @@
 
                     if (currentItem.y >= basketY - 30 && currentItem.y <= basketY + 30) {
                         if (Math.abs(currentItem.x - basketX) < basketWidth / 2) {
-                            
                             if (currentItem.isFruit) {
                                 score += 1;
                             } else {
                                 score = Math.max(0, score - 1);
                             }
-                            
                             scoreTxt.innerText = "คะแนน: " + score;
                             spawnNewItem(); 
                         }
@@ -357,7 +371,7 @@
         function drawGameScene() {
             canvasCtx.save();
             
-            if (isPlaying && currentItem) {
+            if (isPlaying && currentItem && currentItem.img.complete) {
                 canvasCtx.drawImage(
                     currentItem.img, 
                     currentItem.x - (itemSize / 2), 
@@ -367,13 +381,15 @@
                 );
             }
 
-            canvasCtx.drawImage(
-                imgBasket, 
-                basketX - (basketWidth / 2), 
-                basketY - (basketHeight / 2), 
-                basketWidth, 
-                basketHeight
-            );
+            if (imgBasket.complete) {
+                canvasCtx.drawImage(
+                    imgBasket, 
+                    basketX - (basketWidth / 2), 
+                    basketY - (basketHeight / 2), 
+                    basketWidth, 
+                    basketHeight
+                );
+            }
             
             canvasCtx.restore();
         }

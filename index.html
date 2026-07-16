@@ -152,48 +152,30 @@
 
         let basketX = 0;
         let basketY = 0;
-        const basketWidth = 150;
-        const basketHeight = 100;
+        const basketWidth = 160;
+        const basketHeight = 70;
 
         let currentItem = null; 
-        const itemSize = 80;
+        const itemSize = 50; // ขนาดรัศมีของไอเทมทรงกลม
 
-        // 🖼️ รูปภาพเกมที่ใช้ระบบบายพาส CORS
-        const imgBasket = new Image();
-        imgBasket.crossOrigin = "anonymous";
-        imgBasket.src = 'https://images.vexels.com/media/users/3/235777/isolated/preview/26e4e094c77174db37b278f99e4693b4-picnic-basket-flat.png';
-
-        const imgApple = new Image();
-        imgApple.crossOrigin = "anonymous";
-        imgApple.src = 'https://images.vexels.com/media/users/3/147113/isolated/preview/265df07d9b9c9f0bc7d72af5b78e47f7-red-apple-fruit-icon.png';
-
-        const imgBanana = new Image();
-        imgBanana.crossOrigin = "anonymous";
-        imgBanana.src = 'https://images.vexels.com/media/users/3/147117/isolated/preview/30e3863486c05f778f6ef21f5be634df-banana-fruit-icon.png';
-
-        const imgRock = new Image();
-        imgRock.crossOrigin = "anonymous";
-        imgRock.src = 'https://images.vexels.com/media/users/3/145827/isolated/preview/3fa41f80f339cf0766cd64ff1b47ee37-stone-rock-cartoon.png';
-
-        const imgBomb = new Image();
-        imgBomb.crossOrigin = "anonymous";
-        imgBomb.src = 'https://images.vexels.com/media/users/3/153920/isolated/preview/1a9db1548e244837ef585b91b8a53696-bomb-cartoon-icon.png';
-
+        // ดึงรูปพื้นหลังธรรมชาติแบบเบลอป้องกันบั๊ก CORS
         const imgBackground = new Image();
         imgBackground.crossOrigin = "anonymous";
         imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=1000';
 
+        // บล็อกสระไอเทมในเกม
         const itemPool = [
-            { name: "apple", img: imgApple, isFruit: true, speed: 6 },
-            { name: "banana", img: imgBanana, isFruit: true, speed: 5 },
-            { name: "rock", img: imgRock, isFruit: false, speed: 7 },
-            { name: "bomb", img: imgBomb, isFruit: false, speed: 8 }
+            { type: "apple", color: "#ff3333", isFruit: true, speed: 6 },
+            { type: "banana", color: "#ffcc00", isFruit: true, speed: 5 },
+            { type: "rock", color: "#888888", isFruit: false, speed: 7 },
+            { type: "bomb", color: "#333333", isFruit: false, speed: 8 }
         ];
 
         function spawnNewItem() {
             const randomTemplate = itemPool[Math.floor(Math.random() * itemPool.length)];
             currentItem = {
-                img: randomTemplate.img,
+                type: randomTemplate.type,
+                color: randomTemplate.color,
                 isFruit: randomTemplate.isFruit,
                 speed: randomTemplate.speed + (Math.random() * 3), 
                 x: Math.random() * (canvasElement.width - 200) + 100,
@@ -201,7 +183,7 @@
             };
         }
 
-        // 🤖 เรียกใช้งานระบบตรวจจับมือเวอร์ชันเสถียร (MediaPipe Hands Classic)
+        // 🤖 เรียกใช้งานระบบตรวจจับมือ MediaPipe
         const hands = new Hands({
             locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
         });
@@ -220,24 +202,26 @@
             canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
 
             // 2. วาดพื้นหลังโปร่งแสง 40%
-            canvasCtx.save();
-            canvasCtx.globalAlpha = 0.4;
-            canvasCtx.drawImage(imgBackground, 0, 0, canvasElement.width, canvasElement.height);
-            canvasCtx.restore();
+            try {
+                canvasCtx.save();
+                canvasCtx.globalAlpha = 0.4;
+                canvasCtx.drawImage(imgBackground, 0, 0, canvasElement.width, canvasElement.height);
+                canvasCtx.restore();
+            } catch(e) { /* บายพาสถ้าเกิดเออเรอร์พื้นหลัง */ }
 
-            // คำนวณตำแหน่งมือ (ถ้าเจอ)
+            // คำนวณตำแหน่งมือควบคุมข้อมือ
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
-                const wrist = landmarks[0]; // ใช้ข้อมือควบคุมตะกร้า
+                const wrist = landmarks[0];
                 basketX = (1 - wrist.x) * canvasElement.width;
             }
 
-            // คำนวณฟิสิกส์เกม
+            // คำนวณเกมและระบบฟิสิกส์
             if (isPlaying && currentItem) {
                 currentItem.y += currentItem.speed;
 
-                // ตรวจสอบการชน (เก็บของ)
-                if (currentItem.y >= basketY - 40 && currentItem.y <= basketY + 40) {
+                // ตรวจสอบการชน (เก็บของใส่ตะกร้า)
+                if (currentItem.y >= basketY - 30 && currentItem.y <= basketY + 30) {
                     if (Math.abs(currentItem.x - basketX) < basketWidth / 2) {
                         if (currentItem.isFruit) {
                             score += 1;
@@ -254,11 +238,10 @@
                 }
             }
 
-            // วาดองค์ประกอบเกม
+            // วาดองค์ประกอบเกมด้วยรูปทรงกราฟิกแทนรูปภาพ
             drawGameScene();
         });
 
-        // เปิดกล้องและรันระบบ
         const camera = new Camera(video, {
             onFrame: async () => {
                 await hands.send({ image: video });
@@ -276,9 +259,6 @@
             basketY = canvasElement.height - 120;
             basketX = canvasElement.width / 2;
             spawnNewItem();
-        }).catch(err => {
-            loadingTxt.innerText = "ไม่สามารถเข้าถึงกล้องได้ กรุณารีเฟรชหน้าเว็บและกดยอมรับสิทธิ์กล้อง";
-            console.error(err);
         });
 
         startBtn.addEventListener("click", () => {
@@ -311,12 +291,46 @@
             statusTxt.innerText = `จบเกม! คุณได้คะแนนทั้งหมด ${score} คะแนน 🌟`;
         }
 
+        // ฟังก์ชันวาดรูปทรงตะกร้าและผลไม้ด้วย Code กราฟิกโดยตรง
         function drawGameScene() {
             canvasCtx.save();
+
+            // 1. วาดของที่ตกลงมา
             if (isPlaying && currentItem) {
-                canvasCtx.drawImage(currentItem.img, currentItem.x - (itemSize / 2), currentItem.y - (itemSize / 2), itemSize, itemSize);
+                canvasCtx.beginPath();
+                canvasCtx.arc(currentItem.x, currentItem.y, itemSize / 2, 0, 2 * Math.PI);
+                canvasCtx.fillStyle = currentItem.color;
+                canvasCtx.fill();
+                canvasCtx.lineWidth = 3;
+                canvasCtx.strokeStyle = "#ffffff";
+                canvasCtx.stroke();
+                
+                // วาดรายละเอียดของขั้วผลไม้หรือชนวนระเบิดให้ดูรู้เรื่อง
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(currentItem.x, currentItem.y - (itemSize/2));
+                canvasCtx.lineTo(currentItem.x + 5, currentItem.y - (itemSize/2) - 10);
+                canvasCtx.strokeStyle = "#553311";
+                canvasCtx.lineWidth = 4;
+                canvasCtx.stroke();
             }
-            canvasCtx.drawImage(imgBasket, basketX - (basketWidth / 2), basketY - (basketHeight / 2), basketWidth, basketHeight);
+
+            // 2. วาดตะกร้าเก็บของ (ครึ่งวงกลมหงายสีน้ำตาลไม้)
+            canvasCtx.beginPath();
+            canvasCtx.arc(basketX, basketY, basketWidth / 2, 0, Math.PI, false);
+            canvasCtx.lineTo(basketX - basketWidth/2, basketY);
+            canvasCtx.fillStyle = "#8B5A2B"; // สีน้ำตาลไม้ตะกร้า
+            canvasCtx.fill();
+            canvasCtx.lineWidth = 5;
+            canvasCtx.strokeStyle = "#5c3a1a";
+            canvasCtx.stroke();
+
+            // วาดขอบบนตะกร้า
+            canvasCtx.beginPath();
+            canvasCtx.ellipse(basketX, basketY, basketWidth / 2, 10, 0, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = "#A0522D";
+            canvasCtx.fill();
+            canvasCtx.stroke();
+
             canvasCtx.restore();
         }
     </script>

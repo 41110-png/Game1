@@ -2,562 +2,877 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ล้างหมี AR 🧸</title>
-
-<!-- Fonts -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🧸 หมีน้อยอาบน้ำ | Bear Cleaning AR Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Itim&family=Mali:wght@400;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
-
-<!-- MediaPipe Hands -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-
+<link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    /* ===== ธีมปกติ / กำลังเล่น (สดใส ฟ้า-ชมพู) ===== */
-    --bg-1: #bfeaf7;
-    --bg-2: #ffd3ea;
-    --card: #ffffff;
-    --ink: #4a3f4d;
-    --accent: #ff8fc0;
-    --accent-2: #7fd9f0;
-    --bear-body: #d9b48a;
-    --bear-muzzle: #f6e3c5;
-    --bear-blush: #ffb3c6;
-    --spot: #8a6a4a;
-
-    /* ===== ธีมล้มเหลว (อึมครึม) ===== */
-    --bg-1-fail: #4b4d63;
-    --bg-2-fail: #2c2c3d;
-    --accent-fail: #8f8fae;
-
-    --transition-slow: 0.9s ease;
+    --pink-1:#ffe3ef;
+    --pink-2:#ffc2dd;
+    --pink-3:#ff9ecb;
+    --blue-1:#e3f4ff;
+    --blue-2:#bfe6ff;
+    --blue-3:#8fd3ff;
+    --cream:#fff8f2;
+    --ink:#6b5361;
+    --ink-soft:#9c8592;
+    --accent:#ff8fb3;
+    --accent-2:#6fc6ff;
+    --good:#8de3b0;
+    --warn:#ffcf7a;
+    --bad:#ff9a9a;
+    --gloom-1:#8a8fa3;
+    --gloom-2:#5f6478;
+    --radius-lg:32px;
+    --radius-md:20px;
+    --radius-sm:12px;
+    --shadow-cute:0 12px 0 rgba(255,159,203,.35), 0 18px 30px rgba(180,120,150,.25);
   }
 
-  *{ box-sizing:border-box; }
-
-  html,body{
-    margin:0; padding:0; height:100%; overflow:hidden;
-    font-family:'Nunito', sans-serif;
-    color:var(--ink);
-  }
+  *{box-sizing:border-box;}
 
   body{
-    background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
-    transition: background var(--transition-slow);
-    display:flex; align-items:center; justify-content:center;
-  }
-
-  body.fail-theme{
-    background: linear-gradient(160deg, var(--bg-1-fail), var(--bg-2-fail));
-  }
-
-  #game-wrap{
-    position:relative;
-    width:min(100vw, 720px);
-    height:min(100vh, 960px);
-    border-radius:28px;
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'M PLUS Rounded 1c','Kosugi Maru',sans-serif;
+    background:
+      radial-gradient(circle at 15% 20%, var(--pink-1), transparent 55%),
+      radial-gradient(circle at 85% 15%, var(--blue-1), transparent 50%),
+      radial-gradient(circle at 50% 90%, var(--pink-2), transparent 50%),
+      linear-gradient(160deg, var(--blue-1), var(--pink-1));
     overflow:hidden;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.18);
-    background:#000;
+    color:var(--ink);
+    transition:background 1.2s ease;
+  }
+  body.gloomy{
+    background:
+      radial-gradient(circle at 15% 20%, #cfd3dd, transparent 55%),
+      radial-gradient(circle at 85% 15%, #bfc4d1, transparent 50%),
+      radial-gradient(circle at 50% 90%, #a9aebd, transparent 50%),
+      linear-gradient(160deg, #9a9fb0, #c3c6d1);
   }
 
-  /* กล้อง (ถูกซ่อน ใช้เป็นแหล่งภาพ) */
-  #input-video{
-    display:none;
-  }
-
-  /* แคนวาสหลัก: วาดภาพจากกล้อง + ตุ๊กตาหมี + คราบสกปรก + มือ */
-  #output-canvas{
-    position:absolute; inset:0;
-    width:100%; height:100%;
-    transform: scaleX(-1); /* กลับด้านให้เหมือนกระจก */
-  }
-
-  /* ===== UI ด้านบน ===== */
-  #hud{
-    position:absolute; top:0; left:0; right:0;
-    display:flex; justify-content:space-between; align-items:center;
-    padding:16px 20px;
-    z-index:5;
+  /* ------- floating sakura petals ------- */
+  .petal{
+    position:fixed;
+    top:-40px;
+    font-size:22px;
+    opacity:.85;
     pointer-events:none;
+    animation:fall linear infinite;
+    filter:saturate(1.1);
+    z-index:0;
+  }
+  body.gloomy .petal{ opacity:.25; filter:grayscale(.8); }
+  @keyframes fall{
+    0%{ transform:translateY(-10vh) translateX(0) rotate(0deg); }
+    100%{ transform:translateY(110vh) translateX(30px) rotate(360deg); }
   }
 
-  .pill{
-    background: rgba(255,255,255,0.85);
-    border-radius: 999px;
-    padding: 8px 18px;
-    font-family:'Itim', sans-serif;
+  /* ------- game window (cute card) ------- */
+  .game-window{
+    position:relative;
+    width:min(94vw, 460px);
+    background:var(--cream);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-cute);
+    border:5px solid #fff;
+    outline:3px solid var(--pink-2);
+    outline-offset:3px;
+    padding:16px 16px 20px;
+    z-index:2;
+    transition:filter 1s ease, outline-color 1s ease;
+  }
+  .game-window.gloomy-filter{
+    filter:grayscale(.55) brightness(.92) saturate(.6);
+    outline-color:var(--gloom-1);
+  }
+
+  .titlebar{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .titlebar h1{
+    font-size:1.25rem;
+    margin:0;
+    color:var(--accent);
+    text-shadow:1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+    letter-spacing:.5px;
+  }
+  body.gloomy .titlebar h1{ color:var(--gloom-2); }
+
+  /* ------- top row: camera + task info ------- */
+  .top-row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:8px;
+  }
+
+  .cam-frame{
+    position:relative;
+    width:132px;
+    min-width:132px;
+    height:99px;
+    border-radius:var(--radius-md);
+    overflow:hidden;
+    border:4px solid #fff;
+    box-shadow:0 6px 0 var(--pink-2), 0 8px 14px rgba(180,120,150,.25);
+    background:#222;
+  }
+  .cam-frame::after{
+    content:"🐾";
+    position:absolute;
+    bottom:2px; right:4px;
+    font-size:14px;
+    filter:drop-shadow(0 1px 0 #fff);
+  }
+  .cam-frame video, .cam-frame canvas{
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    transform:scaleX(-1); /* mirror for natural interaction */
+  }
+
+  .task-panel{
+    flex:1;
+    background:#fff;
+    border-radius:var(--radius-md);
+    padding:8px 10px;
+    box-shadow:0 4px 0 var(--blue-2);
+    min-height:99px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:4px;
+  }
+  .task-panel .label{
+    font-size:.68rem;
+    color:var(--ink-soft);
+  }
+  .task-panel .task-text{
+    font-size:.92rem;
     font-weight:700;
-    font-size: 15px;
-    color: var(--ink);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .gesture-badge{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    width:28px;height:28px;
+    border-radius:50%;
+    background:var(--blue-2);
+    font-size:15px;
   }
 
-  #timer-pill{ min-width:90px; text-align:center; }
-  #progress-pill{ min-width:120px; text-align:center; }
+  /* ------- timer bar ------- */
+  .timer-wrap{
+    margin:6px 0 10px;
+  }
+  .timer-track{
+    height:14px;
+    border-radius:20px;
+    background:#f2e6ee;
+    overflow:hidden;
+    box-shadow:inset 0 2px 4px rgba(0,0,0,.08);
+  }
+  .timer-fill{
+    height:100%;
+    width:100%;
+    border-radius:20px;
+    background:linear-gradient(90deg, var(--blue-3), var(--pink-3));
+    transition:width .2s linear, background .4s ease;
+  }
+  .timer-fill.warn{ background:linear-gradient(90deg, var(--warn), var(--pink-3)); }
+  .timer-fill.bad{ background:linear-gradient(90deg, var(--bad), #ff7a7a); }
 
-  /* ===== ข้อความผลลัพธ์ ===== */
-  #result-overlay{
-    position:absolute; inset:0;
-    display:flex; flex-direction:column; align-items:center; justify-content:flex-start;
-    padding-top: 12%;
-    gap:14px;
-    background: rgba(0,0,0,0);
-    opacity:0; pointer-events:none;
-    transition: opacity 0.5s ease, background 0.5s ease;
-    z-index:10;
+  /* ------- stage (bear + basket) ------- */
+  .stage-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:1/1;
+    background:
+      radial-gradient(circle at 50% 20%, #ffffff 0%, var(--blue-1) 55%, var(--pink-1) 100%);
+    border-radius:var(--radius-md);
+    overflow:hidden;
+    box-shadow:inset 0 0 0 4px #fff, 0 4px 0 var(--pink-2);
+  }
+  .stage-wrap svg{ width:100%; height:100%; display:block; }
+
+  /* dirt spot interactivity visuals handled inline via JS-set attrs */
+  .spot-ring{
+    fill:none;
+    stroke:#ffffffaa;
+    stroke-width:5;
+    stroke-linecap:round;
+    transform-origin:center;
   }
 
-  #result-overlay.show{
-    opacity:1; pointer-events:all;
-    background: rgba(20,15,25,0.35);
-  }
-
-  #result-title{
-    font-family:'Itim', sans-serif;
-    font-weight:800;
-    font-size: 44px;
-    padding: 10px 30px;
-    border-radius: 24px;
-    background: var(--card);
-    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-  }
-
-  #result-title.success{ color:#3aa66b; }
-  #result-title.fail{ color:#7a5c8c; }
-
-  #retry-btn{
-    font-family:'Itim', sans-serif;
-    font-weight:700;
-    font-size:18px;
-    border:none;
-    border-radius:999px;
-    padding:12px 30px;
-    background: var(--accent);
-    color:white;
-    cursor:pointer;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
-  }
-
-  #retry-btn:active{ transform: translateY(1px); }
-
-  #start-overlay{
-    position:absolute; inset:0;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:16px;
-    background: linear-gradient(160deg, var(--bg-1), var(--bg-2));
-    z-index:20;
+  /* hand cursor */
+  .hand-cursor{
+    position:absolute;
+    width:46px;
+    height:46px;
+    font-size:34px;
+    line-height:46px;
     text-align:center;
-    padding: 30px;
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+    filter:drop-shadow(0 3px 3px rgba(0,0,0,.2));
+    transition:font-size .15s ease;
+    z-index:5;
   }
 
-  #start-overlay h1{
-    font-family:'Itim', sans-serif;
-    font-size: 30px;
-    margin:0;
+  /* sparkle particles */
+  .sparkle{
+    position:absolute;
+    pointer-events:none;
+    font-size:18px;
+    animation:sparkle-pop .7s ease forwards;
+    z-index:6;
+  }
+  @keyframes sparkle-pop{
+    0%{ opacity:1; transform:translate(-50%,-50%) scale(.4) translateY(0);}
+    100%{ opacity:0; transform:translate(-50%,-50%) scale(1.3) translateY(-30px);}
   }
 
-  #start-overlay p{
-    max-width: 320px;
-    line-height:1.5;
-    margin:0;
+  /* ------- overlays (start / result) ------- */
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(255,248,242,.94);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    gap:10px;
+    padding:16px;
+    border-radius:var(--radius-md);
+    z-index:10;
+    transition:opacity .3s ease;
   }
+  .overlay.hidden{ display:none; }
+  .overlay h2{ margin:0; font-size:1.35rem; color:var(--accent); }
+  .overlay p{ margin:0; font-size:.85rem; color:var(--ink-soft); max-width:280px; }
 
-  #start-btn{
-    font-family:'Itim', sans-serif;
-    font-weight:800;
-    font-size:20px;
+  .cute-btn{
+    font-family:inherit;
+    font-weight:700;
+    font-size:.95rem;
+    color:#fff;
+    background:linear-gradient(180deg, var(--accent), var(--pink-3));
     border:none;
-    border-radius:999px;
-    padding:14px 36px;
-    background: var(--accent-2);
-    color:white;
+    padding:12px 26px;
+    border-radius:30px;
+    box-shadow:0 5px 0 #d9628f;
     cursor:pointer;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.2);
+    transition:transform .1s ease;
+  }
+  .cute-btn:active{ transform:translateY(3px); box-shadow:0 2px 0 #d9628f; }
+  .cute-btn.blue{ background:linear-gradient(180deg, var(--accent-2), #4fb3ff); box-shadow:0 5px 0 #2e8fd6; }
+
+  .result-emoji{ font-size:3.2rem; }
+
+  /* result overlay theme */
+  .overlay.success{ background:rgba(255,246,250,.95); }
+  .overlay.fail{ background:rgba(230,232,238,.95); }
+  .overlay.fail h2{ color:var(--gloom-2); }
+
+  .confetti-piece{
+    position:absolute;
+    top:-10px;
+    font-size:16px;
+    animation:confetti-fall 1.4s ease-in forwards;
+    z-index:11;
+  }
+  @keyframes confetti-fall{
+    0%{ transform:translateY(0) rotate(0deg); opacity:1; }
+    100%{ transform:translateY(220px) rotate(360deg); opacity:0; }
+  }
+
+  .footnote{
+    text-align:center;
+    font-size:.68rem;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+
+  @media (max-width:380px){
+    .cam-frame{ width:104px; min-width:104px; height:78px; }
+    .task-panel{ min-height:78px; }
   }
 </style>
 </head>
 <body>
 
-<div id="game-wrap">
+<div class="game-window" id="gameWindow">
 
-  <video id="input-video" playsinline></video>
-  <canvas id="output-canvas"></canvas>
-
-  <div id="hud">
-    <div id="progress-pill" class="pill">สะอาด 0%</div>
-    <div id="timer-pill" class="pill">⏱ 20</div>
+  <div class="titlebar">
+    <h1>🧸 หมีน้อยอาบน้ำ</h1>
   </div>
 
-  <div id="result-overlay">
-    <div id="result-title">สำเร็จ!</div>
-    <button id="retry-btn">เล่นอีกครั้ง</button>
+  <div class="top-row">
+    <div class="cam-frame">
+      <video id="inputVideo" playsinline></video>
+      <canvas id="handOverlay"></canvas>
+    </div>
+    <div class="task-panel">
+      <div class="label">ภารกิจตอนนี้</div>
+      <div class="task-text">
+        <span class="gesture-badge" id="gestureIcon">🖐️</span>
+        <span id="taskText">กดเริ่มเกมเพื่อพาหมีออกจากตะกร้า</span>
+      </div>
+      <div class="label" id="spotsLeftLabel">จุดสกปรกที่เหลือ: -</div>
+    </div>
   </div>
 
-  <div id="start-overlay">
-    <h1>🧸 ล้างหมีให้สะอาด</h1>
-    <p>ใช้ปลายนิ้วชี้ของคุณถูตรงคราบสกปรกบนตัวหมีให้หมดก่อนเวลาจะหมด!</p>
-    <button id="start-btn">เริ่มเล่น</button>
+  <div class="timer-wrap">
+    <div class="timer-track">
+      <div class="timer-fill" id="timerFill"></div>
+    </div>
   </div>
 
+  <div class="stage-wrap" id="stageWrap">
+    <!-- ================= BEAR + BASKET SVG (full body, nothing cropped) ================= -->
+    <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="floorGlow" cx="50%" cy="85%" r="60%">
+          <stop offset="0%" stop-color="#ffe9f2"/>
+          <stop offset="100%" stop-color="#ffe9f200"/>
+        </radialGradient>
+      </defs>
+      <ellipse cx="150" cy="255" rx="110" ry="18" fill="url(#floorGlow)"/>
+
+      <!-- basket -->
+      <g id="basket">
+        <path d="M70 250 Q150 280 230 250 L218 220 Q150 240 82 220 Z" fill="#e3a86b"/>
+        <path d="M82 220 Q150 240 218 220" fill="none" stroke="#c98a4c" stroke-width="4"/>
+        <path d="M75 235 Q150 258 225 235" fill="none" stroke="#c98a4c" stroke-width="3" opacity=".7"/>
+        <path d="M78 245 Q150 268 222 245" fill="none" stroke="#c98a4c" stroke-width="3" opacity=".7"/>
+      </g>
+
+      <!-- ================= BEAR GROUP (moves up out of basket on start) ================= -->
+      <g id="bearGroup" transform="translate(0,18)">
+        <!-- back legs -->
+        <ellipse cx="112" cy="235" rx="22" ry="16" fill="#c98a5a"/>
+        <ellipse cx="188" cy="235" rx="22" ry="16" fill="#c98a5a"/>
+        <ellipse cx="112" cy="238" rx="12" ry="8" fill="#eccbab"/>
+        <ellipse cx="188" cy="238" rx="12" ry="8" fill="#eccbab"/>
+
+        <!-- body -->
+        <ellipse cx="150" cy="185" rx="58" ry="52" fill="#d69a68"/>
+        <ellipse cx="150" cy="196" rx="34" ry="30" fill="#eccbab"/>
+
+        <!-- arms -->
+        <g id="leftArm">
+          <ellipse cx="98" cy="175" rx="20" ry="30" fill="#d69a68" transform="rotate(-18 98 175)"/>
+          <ellipse cx="92" cy="198" rx="11" ry="9" fill="#eccbab"/>
+        </g>
+        <g id="rightArm">
+          <ellipse cx="202" cy="175" rx="20" ry="30" fill="#d69a68" transform="rotate(18 202 175)"/>
+          <ellipse cx="208" cy="198" rx="11" ry="9" fill="#eccbab"/>
+        </g>
+
+        <!-- head -->
+        <g id="bearHead">
+          <ellipse cx="112" cy="96" rx="20" ry="20" fill="#d69a68"/>
+          <ellipse cx="188" cy="96" rx="20" ry="20" fill="#d69a68"/>
+          <ellipse cx="112" cy="96" rx="10" ry="10" fill="#f2d7bd"/>
+          <ellipse cx="188" cy="96" rx="10" ry="10" fill="#f2d7bd"/>
+
+          <ellipse cx="150" cy="120" rx="52" ry="48" fill="#d69a68"/>
+          <ellipse cx="150" cy="132" rx="30" ry="24" fill="#eccbab"/>
+
+          <!-- blush -->
+          <ellipse cx="122" cy="132" rx="9" ry="5" fill="#ffb6c9" opacity=".8"/>
+          <ellipse cx="178" cy="132" rx="9" ry="5" fill="#ffb6c9" opacity=".8"/>
+
+          <!-- eyes (normal) -->
+          <g id="eyesNormal">
+            <circle cx="132" cy="112" r="5" fill="#5a3d2b"/>
+            <circle cx="168" cy="112" r="5" fill="#5a3d2b"/>
+            <circle cx="133.5" cy="110" r="1.6" fill="#fff"/>
+            <circle cx="169.5" cy="110" r="1.6" fill="#fff"/>
+          </g>
+          <!-- eyes (happy ^_^) -->
+          <g id="eyesHappy" opacity="0">
+            <path d="M124 112 Q132 104 140 112" stroke="#5a3d2b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M160 112 Q168 104 176 112" stroke="#5a3d2b" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- eyebrows (sad) -->
+          <g id="browsSad" opacity="0">
+            <path d="M124 100 L140 106" stroke="#5a3d2b" stroke-width="3" stroke-linecap="round"/>
+            <path d="M176 100 L160 106" stroke="#5a3d2b" stroke-width="3" stroke-linecap="round"/>
+          </g>
+
+          <!-- nose + mouth -->
+          <ellipse cx="150" cy="128" rx="7" ry="5" fill="#5a3d2b"/>
+          <path id="mouthNormal" d="M150 133 Q150 140 142 142 M150 133 Q150 140 158 142" stroke="#5a3d2b" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+          <path id="mouthHappy" d="M132 136 Q150 154 168 136" stroke="#5a3d2b" stroke-width="3" fill="none" stroke-linecap="round" opacity="0"/>
+          <path id="mouthSad" d="M136 148 Q150 136 164 148" stroke="#5a3d2b" stroke-width="3" fill="none" stroke-linecap="round" opacity="0"/>
+          <!-- tear (sad) -->
+          <path id="tear" d="M176 118 q4 8 0 14 q-4 -2 -4 -7 q0 -5 4 -7 Z" fill="#8fd3ff" opacity="0"/>
+        </g>
+      </g>
+
+      <!-- ============ DIRT SPOTS (progress ring + blob + gesture icon) ============ -->
+      <g id="dirtSpots">
+        <!-- spot 1: head -->
+        <g class="dirt-spot" data-id="head" data-gesture="fist" transform="translate(150,90)">
+          <circle r="20" fill="#8a6a4f" opacity=".55" class="blob"/>
+          <circle r="20" class="spot-ring" stroke-dasharray="0 126"/>
+          <text y="6" text-anchor="middle" font-size="16" class="icon">🧼</text>
+        </g>
+        <!-- spot 2: tummy -->
+        <g class="dirt-spot" data-id="tummy" data-gesture="open" transform="translate(150,190)">
+          <circle r="24" fill="#8a6a4f" opacity=".55" class="blob"/>
+          <circle r="24" class="spot-ring" stroke-dasharray="0 151"/>
+          <text y="6" text-anchor="middle" font-size="16" class="icon">🪶</text>
+        </g>
+        <!-- spot 3: left paw -->
+        <g class="dirt-spot" data-id="leftpaw" data-gesture="pinch" transform="translate(92,200)">
+          <circle r="15" fill="#8a6a4f" opacity=".55" class="blob"/>
+          <circle r="15" class="spot-ring" stroke-dasharray="0 94"/>
+          <text y="5" text-anchor="middle" font-size="13" class="icon">✨</text>
+        </g>
+        <!-- spot 4: right foot -->
+        <g class="dirt-spot" data-id="rightfoot" data-gesture="open" transform="translate(188,236)">
+          <circle r="15" fill="#8a6a4f" opacity=".55" class="blob"/>
+          <circle r="15" class="spot-ring" stroke-dasharray="0 94"/>
+          <text y="5" text-anchor="middle" font-size="13" class="icon">🪶</text>
+        </g>
+      </g>
+    </svg>
+
+    <!-- hand cursor puppet, position driven by MediaPipe landmark -->
+    <div class="hand-cursor" id="handCursor" style="left:50%; top:50%;">🖐️</div>
+
+    <!-- ============== START OVERLAY ============== -->
+    <div class="overlay" id="startOverlay">
+      <div class="result-emoji">🧺🧸</div>
+      <h2>พร้อมอาบน้ำให้หมีน้อยหรือยัง?</h2>
+      <p>ยกมือขึ้นหน้ากล้อง แล้วทำท่าตามสัญลักษณ์ที่ขึ้นบนจุดสกปรกแต่ละจุด ให้ครบภายใน 30 วินาที!</p>
+      <button class="cute-btn blue" id="startBtn">🎥 เปิดกล้อง & เริ่มเล่น</button>
+      <p style="font-size:.65rem;">✊ กำมือ = ถูสบู่ &nbsp; 🖐️ แบมือ = ปัดฝุ่น &nbsp; 🤏 หยิบนิ้ว = เกาเบาๆ</p>
+    </div>
+
+    <!-- ============== RESULT OVERLAY ============== -->
+    <div class="overlay hidden" id="resultOverlay">
+      <div class="result-emoji" id="resultEmoji">🎉</div>
+      <h2 id="resultTitle">สำเร็จ!</h2>
+      <p id="resultDesc">หมีน้อยสะอาดสะอ้านสุดๆ เก่งมากเลย!</p>
+      <button class="cute-btn" id="retryBtn">🔁 เล่นอีกครั้ง</button>
+    </div>
+  </div>
+
+  <p class="footnote">ใช้ MediaPipe Hands ตรวจจับมือผ่านกล้อง • โครงสร้างเริ่มต้นสำหรับต่อยอด</p>
 </div>
 
+<!-- MediaPipe Hands (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+
 <script>
-/* =========================================================
-   ค่าคงที่ / การตั้งค่าเกม
-   ========================================================= */
-const GAME_CONFIG = {
-  timeLimitSeconds: 60,     // เวลาที่ให้ล้างหมี
-  cleanRadius: 60,          // รัศมี (px, บนแคนวาส) ที่นิ้วจะเช็ดโดนคราบ
-  cleanSpeed: 1.8,          // % ความสะอาดต่อเฟรมที่นิ้วอยู่ในคราบ
-  bear: {
-    // ตำแหน่งกึ่งกลางลำตัวหมี เป็นสัดส่วน 0-1 ของแคนวาส (จะคำนวณใหม่ตอน resize)
-    centerXRatio: 0.5,
-    centerYRatio: 0.55,
-    bodyRadiusRatio: 0.24
-  },
-  // คราบสกปรกบนตัวหมี ตำแหน่งเป็น offset จากจุดกึ่งกลางหมี (สัดส่วนของ bodyRadius)
-  dirtySpots: [
-    { dx: -0.35, dy: -0.15, r: 0.16 },
-    { dx:  0.30, dy: -0.05, r: 0.18 },
-    { dx: -0.05, dy:  0.35, r: 0.20 },
-    { dx:  0.35, dy:  0.30, r: 0.15 }
-  ]
+/* =========================================================================
+   BEAR CLEANING AR GAME — starter structure
+   - MediaPipe Hands ตรวจจับมือจากกล้อง (หน้าต่างกล้องเล็กๆ มุมซ้ายบน)
+   - ตำแหน่งมือถูกแปลงเป็น "เคอร์เซอร์มือ" ที่ขยับบนฉากตุ๊กตาหมีเต็มตัว
+     (กล้องดิบไม่บังตัวหมี — หมีอยู่คนละพื้นที่กับพรีวิวกล้อง)
+   - จำแนกท่ามือ 3 แบบ: fist(กำมือ) / open(แบมือ) / pinch(หยิบนิ้ว)
+   - แต่ละจุดสกปรกต้องใช้ท่ามือที่กำหนด ค้างไว้จนครบระยะเวลา จึงจะสะอาด
+   - เวลาทั้งหมด 30 วินาที ทำครบทุกจุด = สำเร็จ, หมดเวลา = ไม่สำเร็จ (หน้าบึ้ง)
+   ========================================================================= */
+
+// ---------- DOM refs ----------
+const videoEl        = document.getElementById('inputVideo');
+const overlayCanvas  = document.getElementById('handOverlay');
+const overlayCtx     = overlayCanvas.getContext('2d');
+const handCursorEl   = document.getElementById('handCursor');
+const startOverlay   = document.getElementById('startOverlay');
+const resultOverlay  = document.getElementById('resultOverlay');
+const startBtn       = document.getElementById('startBtn');
+const retryBtn       = document.getElementById('retryBtn');
+const timerFill      = document.getElementById('timerFill');
+const taskText       = document.getElementById('taskText');
+const gestureIcon    = document.getElementById('gestureIcon');
+const spotsLeftLabel = document.getElementById('spotsLeftLabel');
+const stageWrap      = document.getElementById('stageWrap');
+const gameWindow     = document.getElementById('gameWindow');
+const bearGroup      = document.getElementById('bearGroup');
+const resultEmoji    = document.getElementById('resultEmoji');
+const resultTitle    = document.getElementById('resultTitle');
+const resultDesc     = document.getElementById('resultDesc');
+
+const GESTURE_LABELS = {
+  fist:  { icon:'✊', text:'กำมือถูสบู่ตรงจุดสัญลักษณ์ 🧼' },
+  open:  { icon:'🖐️', text:'แบมือปัดฝุ่นตรงจุดสัญลักษณ์ 🪶' },
+  pinch: { icon:'🤏', text:'หยิบนิ้วเกาเบาๆ ตรงจุดสัญลักษณ์ ✨' },
 };
 
-/* =========================================================
-   สถานะเกม (state machine): IDLE -> PLAYING -> SUCCESS / FAIL
-   ========================================================= */
-const GameState = { IDLE: 'idle', PLAYING: 'playing', SUCCESS: 'success', FAIL: 'fail' };
+const TOTAL_TIME = 30; // seconds
+const HOLD_TIME  = 1.3; // seconds required holding correct gesture on a spot
 
-const state = {
-  current: GameState.IDLE,
-  spots: [],              // จะถูกสร้างใหม่ทุกครั้งที่เริ่มเกม {x,y,r,clean(0-100)}
-  timeLeft: GAME_CONFIG.timeLimitSeconds,
-  timerHandle: null,
-  fingerTip: null,        // {x,y} ตำแหน่งปลายนิ้วชี้ล่าสุดบนแคนวาส (พิกัดจริง ไม่ mirror)
-};
+let gameActive = false;
+let timeLeft = TOTAL_TIME;
+let timerInterval = null;
+let lastFrameTime = performance.now();
 
-/* =========================================================
-   DOM references
-   ========================================================= */
-const videoEl = document.getElementById('input-video');
-const canvasEl = document.getElementById('output-canvas');
-const ctx = canvasEl.getContext('2d');
+// current detected gesture + cursor position (in stage viewBox coords 0-300)
+let currentGesture = null;
+let cursorX = 150, cursorY = 150;
+let handVisible = false;
 
-const progressPill = document.getElementById('progress-pill');
-const timerPill = document.getElementById('timer-pill');
-const resultOverlay = document.getElementById('result-overlay');
-const resultTitle = document.getElementById('result-title');
-const retryBtn = document.getElementById('retry-btn');
-const startOverlay = document.getElementById('start-overlay');
-const startBtn = document.getElementById('start-btn');
+// dirt spots state, built from DOM
+const spotEls = Array.from(document.querySelectorAll('.dirt-spot'));
+const spots = spotEls.map(el => {
+  const t = el.getAttribute('transform'); // translate(x,y)
+  const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(t);
+  return {
+    id: el.dataset.id,
+    gesture: el.dataset.gesture,
+    x: parseFloat(m[1]),
+    y: parseFloat(m[2]),
+    r: parseFloat(el.querySelector('.blob').getAttribute('r')),
+    ringEl: el.querySelector('.spot-ring'),
+    blobEl: el.querySelector('.blob'),
+    groupEl: el,
+    progress: 0, // 0..HOLD_TIME
+    done: false,
+  };
+});
 
-/* =========================================================
-   ปรับขนาดแคนวาสให้พอดีกล่องเกม
-   ========================================================= */
-function resizeCanvas() {
-  const wrap = document.getElementById('game-wrap');
-  canvasEl.width = wrap.clientWidth;
-  canvasEl.height = wrap.clientHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-
-/* =========================================================
-   สร้างคราบสกปรกใหม่ตามตำแหน่งหมีปัจจุบัน
-   ========================================================= */
-function createDirtySpots() {
-  const cx = canvasEl.width * GAME_CONFIG.bear.centerXRatio;
-  const cy = canvasEl.height * GAME_CONFIG.bear.centerYRatio;
-  const bodyR = Math.min(canvasEl.width, canvasEl.height) * GAME_CONFIG.bear.bodyRadiusRatio;
-
-  state.spots = GAME_CONFIG.dirtySpots.map(cfg => ({
-    x: cx + cfg.dx * bodyR * 2,
-    y: cy + cfg.dy * bodyR * 2,
-    r: cfg.r * bodyR * 2,
-    clean: 0 // 0 = สกปรกเต็มที่, 100 = สะอาด
-  }));
-}
-
-/* =========================================================
-   วาดตุ๊กตาหมี (โครงร่างเรขาคณิตง่าย ๆ)
-   mood: 'happy' | 'sad' | 'neutral'
-   ========================================================= */
-function drawBear(mood) {
-  const cx = canvasEl.width * GAME_CONFIG.bear.centerXRatio;
-  const cy = canvasEl.height * GAME_CONFIG.bear.centerYRatio;
-  const bodyR = Math.min(canvasEl.width, canvasEl.height) * GAME_CONFIG.bear.bodyRadiusRatio;
-
-  const bodyColor = getComputedStyle(document.body).getPropertyValue('--bear-body').trim();
-  const muzzleColor = getComputedStyle(document.body).getPropertyValue('--bear-muzzle').trim();
-  const blushColor = getComputedStyle(document.body).getPropertyValue('--bear-blush').trim();
-
-  ctx.save();
-
-  // หู
-  ctx.fillStyle = bodyColor;
-  ctx.beginPath();
-  ctx.arc(cx - bodyR * 0.75, cy - bodyR * 0.85, bodyR * 0.32, 0, Math.PI * 2);
-  ctx.arc(cx + bodyR * 0.75, cy - bodyR * 0.85, bodyR * 0.32, 0, Math.PI * 2);
-  ctx.fill();
-
-  // หัว
-  ctx.beginPath();
-  ctx.arc(cx, cy, bodyR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ปาก (muzzle)
-  ctx.fillStyle = muzzleColor;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + bodyR * 0.25, bodyR * 0.55, bodyR * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // แก้มปัดแดง
-  ctx.fillStyle = blushColor;
-  ctx.globalAlpha = 0.7;
-  ctx.beginPath();
-  ctx.ellipse(cx - bodyR * 0.55, cy + bodyR * 0.15, bodyR * 0.14, bodyR * 0.09, 0, 0, Math.PI * 2);
-  ctx.ellipse(cx + bodyR * 0.55, cy + bodyR * 0.15, bodyR * 0.14, bodyR * 0.09, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // จมูก
-  ctx.fillStyle = '#5a4632';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + bodyR * 0.05, bodyR * 0.13, bodyR * 0.09, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ตา + ปาก ตามอารมณ์
-  ctx.strokeStyle = '#4a3520';
-  ctx.fillStyle = '#4a3520';
-  ctx.lineWidth = bodyR * 0.045;
-  ctx.lineCap = 'round';
-
-  const eyeY = cy - bodyR * 0.12;
-  const eyeDX = bodyR * 0.32;
-
-  if (mood === 'sad') {
-    // ตาโค้งลง (หรี่)
-    ctx.beginPath();
-    ctx.arc(cx - eyeDX, eyeY, bodyR * 0.07, Math.PI * 0.15, Math.PI * 0.85);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx + eyeDX, eyeY, bodyR * 0.07, Math.PI * 0.15, Math.PI * 0.85);
-    ctx.stroke();
-
-    // ปากบึ้ง (โค้งคว่ำ)
-    ctx.beginPath();
-    ctx.arc(cx, cy + bodyR * 0.55, bodyR * 0.22, Math.PI * 1.15, Math.PI * 1.85);
-    ctx.stroke();
-  } else {
-    // ตากลมปกติ / ยิ้ม
-    ctx.beginPath();
-    ctx.arc(cx - eyeDX, eyeY, bodyR * 0.06, 0, Math.PI * 2);
-    ctx.arc(cx + eyeDX, eyeY, bodyR * 0.06, 0, Math.PI * 2);
-    ctx.fill();
-
-    // ปากยิ้ม (โค้งหงาย)
-    ctx.beginPath();
-    ctx.arc(cx, cy + bodyR * 0.35, bodyR * 0.22, Math.PI * 0.15, Math.PI * 0.85);
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
-
-/* =========================================================
-   วาดคราบสกปรกที่ยังไม่สะอาด (ความโปร่งใสลดลงตามค่า clean)
-   ========================================================= */
-function drawDirtySpots() {
-  const spotColor = getComputedStyle(document.body).getPropertyValue('--spot').trim();
-  state.spots.forEach(spot => {
-    const remaining = 1 - (spot.clean / 100);
-    if (remaining <= 0) return;
-    ctx.save();
-    ctx.globalAlpha = 0.55 * remaining;
-    ctx.fillStyle = spotColor;
-    ctx.beginPath();
-    ctx.arc(spot.x, spot.y, spot.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+function resetSpots(){
+  spots.forEach(s=>{
+    s.progress = 0;
+    s.done = false;
+    s.blobEl.style.opacity = .55;
+    s.groupEl.style.display = '';
+    const ring = s.ringEl;
+    const circumference = 2*Math.PI*s.r;
+    ring.setAttribute('stroke-dasharray', `0 ${circumference}`);
   });
 }
 
-/* =========================================================
-   วาดตำแหน่งปลายนิ้ว (เอฟเฟกต์ฟองสบู่น่ารัก ๆ)
-   ========================================================= */
-function drawFingerCursor() {
-  if (!state.fingerTip) return;
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--accent').trim();
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(state.fingerTip.x, state.fingerTip.y, 22, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+// ---------- UI helpers ----------
+function updateTaskPanel(){
+  const remaining = spots.filter(s=>!s.done);
+  spotsLeftLabel.textContent = `จุดสกปรกที่เหลือ: ${remaining.length}`;
+  if(remaining.length === 0){ return; }
+  // Highlight nearest un-cleaned spot as the suggested task
+  const target = remaining[0];
+  const g = GESTURE_LABELS[target.gesture];
+  gestureIcon.textContent = g.icon;
+  taskText.textContent = g.text;
 }
 
-/* =========================================================
-   คำนวณเปอร์เซ็นต์ความสะอาดรวม
-   ========================================================= */
-function getOverallCleanPercent() {
-  if (state.spots.length === 0) return 0;
-  const total = state.spots.reduce((sum, s) => sum + s.clean, 0);
-  return Math.round(total / state.spots.length);
+function setTimerBar(){
+  const pct = Math.max(0, (timeLeft/TOTAL_TIME)*100);
+  timerFill.style.width = pct + '%';
+  timerFill.classList.toggle('warn', timeLeft <= 15 && timeLeft > 8);
+  timerFill.classList.toggle('bad', timeLeft <= 8);
 }
 
-/* =========================================================
-   อัปเดตความสะอาดของคราบเมื่อปลายนิ้วอยู่ใกล้
-   ========================================================= */
-function updateCleaning() {
-  if (!state.fingerTip || state.current !== GameState.PLAYING) return;
+function setFace(state){
+  // state: 'normal' | 'happy' | 'sad'
+  document.getElementById('eyesNormal').style.opacity = state==='normal'?1:0;
+  document.getElementById('eyesHappy').style.opacity  = state==='happy'?1:0;
+  document.getElementById('browsSad').style.opacity   = state==='sad'?1:0;
+  document.getElementById('mouthNormal').style.opacity= state==='normal'?1:0;
+  document.getElementById('mouthHappy').style.opacity = state==='happy'?1:0;
+  document.getElementById('mouthSad').style.opacity   = state==='sad'?1:0;
+  document.getElementById('tear').style.opacity       = state==='sad'?1:0;
+}
 
-  state.spots.forEach(spot => {
-    if (spot.clean >= 100) return;
-    const dist = Math.hypot(state.fingerTip.x - spot.x, state.fingerTip.y - spot.y);
-    if (dist < GAME_CONFIG.cleanRadius) {
-      spot.clean = Math.min(100, spot.clean + GAME_CONFIG.cleanSpeed);
-    }
-  });
-
-  progressPill.textContent = `สะอาด ${getOverallCleanPercent()}%`;
-
-  if (state.spots.every(s => s.clean >= 100)) {
-    endGame(true);
+function spawnSparkles(cx, cy){
+  const container = stageWrap;
+  const rect = stageWrap.getBoundingClientRect();
+  for(let i=0;i<6;i++){
+    const s = document.createElement('div');
+    s.className = 'sparkle';
+    s.textContent = ['✨','⭐','💧','🫧'][Math.floor(Math.random()*4)];
+    const px = (cx/300)*rect.width + (Math.random()*30-15);
+    const py = (cy/300)*rect.height + (Math.random()*30-15);
+    s.style.left = px+'px';
+    s.style.top = py+'px';
+    container.appendChild(s);
+    setTimeout(()=>s.remove(), 750);
   }
 }
 
-/* =========================================================
-   MediaPipe Hands: ตั้งค่าและ callback ผลลัพธ์
-   ========================================================= */
-const hands = new Hands({
-  locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-});
-
-hands.setOptions({
-  maxNumHands: 1,
-  modelComplexity: 1,
-  minDetectionConfidence: 0.6,
-  minTrackingConfidence: 0.6
-});
-
-hands.onResults(onHandResults);
-
-function onHandResults(results) {
-  // 1) วาดภาพจากกล้องเป็นพื้นหลังของแคนวาสก่อน
-  ctx.save();
-  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-  ctx.drawImage(results.image, 0, 0, canvasEl.width, canvasEl.height);
-  ctx.restore();
-
-  // 2) อ่านตำแหน่งปลายนิ้วชี้ (landmark index 8) ถ้าเจอมือ
-  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-    const indexTip = results.multiHandLandmarks[0][8];
-    state.fingerTip = {
-      x: indexTip.x * canvasEl.width,
-      y: indexTip.y * canvasEl.height
-    };
-  } else {
-    state.fingerTip = null;
+function spawnConfetti(){
+  const emojis = ['🎉','🧼','🫧','💗','⭐','🩵'];
+  for(let i=0;i<24;i++){
+    const c = document.createElement('div');
+    c.className = 'confetti-piece';
+    c.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    c.style.left = (Math.random()*100)+'%';
+    c.style.animationDelay = (Math.random()*.4)+'s';
+    resultOverlay.appendChild(c);
+    setTimeout(()=>c.remove(), 1600);
   }
-
-  // 3) อัปเดตตรรกะเกม
-  updateCleaning();
-
-  // 4) วาดหมี + คราบสกปรก + เคอร์เซอร์นิ้ว ทับบนภาพกล้อง
-  const mood = state.current === GameState.FAIL ? 'sad' : 'neutral';
-  drawBear(mood);
-  drawDirtySpots();
-  drawFingerCursor();
 }
 
-/* =========================================================
-   ตัวจับเวลาการเล่น
-   ========================================================= */
-function startTimer() {
-  state.timeLeft = GAME_CONFIG.timeLimitSeconds;
-  timerPill.textContent = `⏱ ${state.timeLeft}`;
+// ---------- game flow ----------
+function startGame(){
+  resetSpots();
+  timeLeft = TOTAL_TIME;
+  gameActive = true;
+  setFace('normal');
+  gameWindow.classList.remove('gloomy-filter');
+  document.body.classList.remove('gloomy');
+  resultOverlay.classList.add('hidden');
+  startOverlay.classList.add('hidden');
+  bearGroup.style.transition = 'transform .8s ease';
+  bearGroup.style.transform = 'translate(0,0)'; // hop out of basket
+  updateTaskPanel();
+  setTimerBar();
 
-  state.timerHandle = setInterval(() => {
-    state.timeLeft -= 1;
-    timerPill.textContent = `⏱ ${Math.max(0, state.timeLeft)}`;
-
-    if (state.timeLeft <= 0) {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(()=>{
+    if(!gameActive) return;
+    timeLeft -= 0.2;
+    if(timeLeft <= 0){
+      timeLeft = 0;
+      setTimerBar();
       endGame(false);
+      return;
     }
-  }, 1000);
+    setTimerBar();
+  }, 200);
 }
 
-function stopTimer() {
-  if (state.timerHandle) {
-    clearInterval(state.timerHandle);
-    state.timerHandle = null;
-  }
-}
+function endGame(success){
+  gameActive = false;
+  clearInterval(timerInterval);
+  resultOverlay.classList.remove('hidden');
+  resultOverlay.classList.toggle('success', success);
+  resultOverlay.classList.toggle('fail', !success);
 
-/* =========================================================
-   เริ่ม / จบเกม
-   ========================================================= */
-function startGame() {
-  startOverlay.style.display = 'none';
-  resultOverlay.classList.remove('show');
-  document.body.classList.remove('fail-theme');
-
-  resizeCanvas();
-  createDirtySpots();
-
-  state.current = GameState.PLAYING;
-  progressPill.textContent = 'สะอาด 0%';
-
-  startTimer();
-}
-
-function endGame(success) {
-  if (state.current !== GameState.PLAYING) return; // กันเรียกซ้ำ
-  stopTimer();
-  state.current = success ? GameState.SUCCESS : GameState.FAIL;
-
-  if (success) {
-    resultTitle.textContent = '🎉 สำเร็จ! หมีสะอาดแล้ว';
-    resultTitle.className = 'success';
+  if(success){
+    setFace('happy');
+    resultEmoji.textContent = '🎉🧸💕';
+    resultTitle.textContent = 'สำเร็จ!';
+    resultDesc.textContent = 'หมีน้อยสะอาดสะอ้านสุดๆ เก่งมากเลย!';
+    spawnConfetti();
   } else {
-    resultTitle.textContent = '😢 ไม่สำเร็จ ลองอีกครั้งนะ';
-    resultTitle.className = 'fail';
-    document.body.classList.add('fail-theme');
+    setFace('sad');
+    gameWindow.classList.add('gloomy-filter');
+    document.body.classList.add('gloomy');
+    resultEmoji.textContent = '🌧️🧸';
+    resultTitle.textContent = 'ไม่สำเร็จ';
+    resultDesc.textContent = 'หมีน้อยยังสกปรกอยู่... ลองใหม่อีกครั้งนะ';
   }
-
-  resultOverlay.classList.add('show');
 }
 
-retryBtn.addEventListener('click', startGame);
-startBtn.addEventListener('click', startGame);
+startBtn.addEventListener('click', async ()=>{
+  startBtn.disabled = true;
+  startBtn.textContent = 'กำลังเปิดกล้อง...';
+  try{
+    await initCamera();
+    startGame();
+  }catch(err){
+    taskText.textContent = 'ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้กล้อง';
+    startBtn.disabled = false;
+    startBtn.textContent = '🎥 เปิดกล้อง & เริ่มเล่น';
+    console.error(err);
+  }
+});
 
-/* =========================================================
-   เปิดกล้องด้วย CameraUtils แล้วส่งเฟรมให้ MediaPipe Hands
-   ========================================================= */
-async function setupCamera() {
-  resizeCanvas();
+retryBtn.addEventListener('click', ()=>{
+  startGame();
+});
 
-  const camera = new Camera(videoEl, {
-    onFrame: async () => {
-      await hands.send({ image: videoEl });
-    },
-    width: 720,
-    height: 960
+// ---------- gesture classification ----------
+function dist(a,b){
+  const dx=a.x-b.x, dy=a.y-b.y;
+  return Math.sqrt(dx*dx+dy*dy);
+}
+
+function classifyGesture(landmarks){
+  const wrist = landmarks[0];
+  const middleMcp = landmarks[9];
+  const handSize = dist(wrist, middleMcp) || 0.001;
+
+  const tips = [8,12,16,20];   // index, middle, ring, pinky tips
+  const mcps = [5,9,13,17];    // corresponding mcp joints
+
+  let curled = 0;
+  tips.forEach((tipIdx, i)=>{
+    const tip = landmarks[tipIdx];
+    const mcp = landmarks[mcps[i]];
+    const tipToWrist = dist(tip, wrist);
+    const mcpToWrist = dist(mcp, wrist);
+    if(tipToWrist < mcpToWrist * 1.05) curled++;
   });
 
-  await camera.start();
+  const thumbTip = landmarks[4];
+  const indexTip = landmarks[8];
+  const pinchDist = dist(thumbTip, indexTip) / handSize;
+
+  if(pinchDist < 0.55 && curled <= 2) return 'pinch';
+  if(curled >= 3) return 'fist';
+  return 'open';
 }
 
-setupCamera().catch(err => {
-  console.error('ไม่สามารถเปิดกล้องได้:', err);
-  startOverlay.querySelector('p').textContent =
-    'ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้กล้องแล้วโหลดหน้านี้ใหม่';
-});
+// ---------- MediaPipe setup ----------
+let cameraUtil = null;
+let handsModel = null;
+
+function onResults(results){
+  // draw small cute skeleton on the mini camera preview
+  overlayCtx.save();
+  overlayCtx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height);
+
+  if(results.multiHandLandmarks && results.multiHandLandmarks.length > 0){
+    const landmarks = results.multiHandLandmarks[0];
+    handVisible = true;
+
+    // pastel skeleton drawing
+    if(window.drawConnectors && window.HAND_CONNECTIONS){
+      drawConnectors(overlayCtx, landmarks, HAND_CONNECTIONS, {color:'#ffb6d9', lineWidth:2});
+      drawLandmarks(overlayCtx, landmarks, {color:'#6fc6ff', lineWidth:1, radius:2.2});
+    }
+
+    currentGesture = classifyGesture(landmarks);
+
+    // use middle-finger MCP (landmark 9) as the puppet control point (stable, center of palm)
+    const ctrl = landmarks[9];
+    // mirror x because video is mirrored visually
+    const mx = 1 - ctrl.x;
+    const my = ctrl.y;
+    cursorX = mx * 300;
+    cursorY = my * 300;
+  } else {
+    handVisible = false;
+    currentGesture = null;
+  }
+  overlayCtx.restore();
+
+  updateHandCursorUI();
+  gameLoopStep();
+}
+
+function updateHandCursorUI(){
+  const rect = stageWrap.getBoundingClientRect();
+  const leftPct = (cursorX/300)*100;
+  const topPct  = (cursorY/300)*100;
+  handCursorEl.style.left = leftPct + '%';
+  handCursorEl.style.top  = topPct + '%';
+
+  if(!handVisible){
+    handCursorEl.style.opacity = .25;
+    handCursorEl.textContent = '❔';
+    return;
+  }
+  handCursorEl.style.opacity = 1;
+  if(currentGesture === 'fist')  handCursorEl.textContent = '✊';
+  else if(currentGesture === 'pinch') handCursorEl.textContent = '🤏';
+  else handCursorEl.textContent = '🖐️';
+}
+
+function gameLoopStep(){
+  const now = performance.now();
+  const dt = Math.min(0.12, (now - lastFrameTime)/1000);
+  lastFrameTime = now;
+
+  if(!gameActive || !handVisible){
+    return;
+  }
+
+  spots.forEach(spot=>{
+    if(spot.done) return;
+    const d = Math.hypot(cursorX - spot.x, cursorY - spot.y);
+    const withinZone = d <= spot.r + 14; // a little forgiving radius
+    const correctGesture = currentGesture === spot.gesture;
+
+    if(withinZone && correctGesture){
+      spot.progress = Math.min(HOLD_TIME, spot.progress + dt);
+      const circumference = 2*Math.PI*spot.r;
+      const filled = (spot.progress/HOLD_TIME) * circumference;
+      spot.ringEl.setAttribute('stroke-dasharray', `${filled} ${circumference}`);
+      spot.blobEl.style.opacity = .55 * (1 - spot.progress/HOLD_TIME) + .05;
+
+      if(spot.progress >= HOLD_TIME && !spot.done){
+        spot.done = true;
+        spot.groupEl.style.display = 'none';
+        spawnSparkles(spot.x, spot.y);
+        updateTaskPanel();
+        if(spots.every(s=>s.done)){
+          endGame(true);
+        }
+      }
+    } else {
+      // slowly decay progress if not actively holding correct gesture
+      spot.progress = Math.max(0, spot.progress - dt*0.6);
+      const circumference = 2*Math.PI*spot.r;
+      const filled = (spot.progress/HOLD_TIME) * circumference;
+      spot.ringEl.setAttribute('stroke-dasharray', `${filled} ${circumference}`);
+    }
+  });
+}
+
+async function initCamera(){
+  if(cameraUtil) return; // already running
+
+  handsModel = new Hands({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+  });
+  handsModel.setOptions({
+    maxNumHands: 1,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6
+  });
+  handsModel.onResults(onResults);
+
+  // small resolution keeps the mini camera window light & fast
+  overlayCanvas.width = 264;
+  overlayCanvas.height = 198;
+
+  cameraUtil = new Camera(videoEl, {
+    onFrame: async () => {
+      await handsModel.send({image: videoEl});
+    },
+    width: 264,
+    height: 198
+  });
+
+  await cameraUtil.start();
+}
+
+// ---------- decorative floating sakura petals ----------
+function spawnPetals(){
+  const emojis = ['🌸','🌷','💮'];
+  for(let i=0;i<14;i++){
+    const p = document.createElement('div');
+    p.className = 'petal';
+    p.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    p.style.left = Math.random()*100 + 'vw';
+    p.style.animationDuration = (8 + Math.random()*10) + 's';
+    p.style.animationDelay = (Math.random()*10) + 's';
+    p.style.fontSize = (14 + Math.random()*14) + 'px';
+    document.body.appendChild(p);
+  }
+}
+spawnPetals();
+
+// initial UI state
+resetSpots();
+setTimerBar();
+setFace('normal');
 </script>
 </body>
 </html>

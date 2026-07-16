@@ -109,17 +109,18 @@
             color: white;
             font-size: 24px;
             position: absolute;
-            background: rgba(0,0,0,0.6);
-            padding: 10px 20px;
+            background: rgba(0,0,0,0.85);
+            padding: 15px 30px;
             border-radius: 10px;
             text-align: center;
+            z-index: 20;
         }
     </style>
 </head>
 <body>
 
     <div id="game-container">
-        <div id="loading-text">กำลังตั้งค่าระบบกล้อง AR...</div>
+        <div id="loading-text">กำลังเปิดกล้องและตั้งค่าระบบ AR...</div>
         
         <video id="webcam" autoplay playsinline></video>
         <canvas id="canvas-output"></canvas>
@@ -153,18 +154,19 @@
         let basketX = 0;
         let targetBasketX = 0; 
         let basketY = 0;
-        const basketWidth = 180;
-        const basketHeight = 110;
+        let basketWidth = 180;
+        let basketHeight = 110;
 
         let currentItem = null; 
-        const itemSize = 75; 
+        let itemSize = 75; 
+        let firstFrameReceived = false;
 
-        // 🖼️ รูปพื้นหลังธรรมชาติ
+        // 🖼️ รูปพื้นหลังธรรมชาติ (โปร่งแสงด้านหลัง)
         const imgBackground = new Image();
         imgBackground.crossOrigin = "anonymous";
         imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=1000';
 
-        // 📦 ฝังรูปภาพในรูปแบบ SVG Data URI เพื่อป้องกัน CORS 100% (หน้าตาตรงตามที่คุณต้องการ)
+        // 📦 รูปภาพ Vector SVG แบบฝังในโค้ด ปลอดภัย 100% ไม่ดึงรูปจากเว็บนอกให้ค้าง
         const imgApple = new Image();
         imgApple.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='38' cy='55' r='25' fill='%23e63946'/><circle cx='62' cy='55' r='25' fill='%23e63946'/><path d='M35,75 Q50,83 65,75' stroke='%23b21e29' stroke-width='4' fill='none'/><path d='M50,35 Q45,15 55,10' stroke='%235c3d24' stroke-width='5' fill='none'/><path d='M53,15 Q70,10 65,25 Q55,25 53,15' fill='%234ad66d'/></svg>";
 
@@ -172,6 +174,4 @@
         imgBanana.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M20,20 Q60,20 70,60 Q45,75 15,45 Q35,40 20,20' fill='%23ffde4d'/><path d='M15,45 Q12,47 10,42 Q15,35 20,20' fill='%235c6b1a'/><path d='M68,58 Q72,62 75,60' stroke='%233a3a3a' stroke-width='4'/></svg>";
 
         const imgRock = new Image();
-        imgRock.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='20,75 30,30 70,25 85,65 50,85' fill='%237f8c8d'/><polygon points='30,30 50,55 70,25' fill='%2395a5a6'/><line x1='30' y1='30' x2='85' y2='65' stroke='%23555' stroke-width='2'/></svg>";
-
-        const imgBomb = new Image();
+        imgRock.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='20,75 30,30 70,25 85,65 50,85' fill='%237f8c8d'/><polygon points='30,30 50,55 70,25' fill='%

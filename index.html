@@ -119,7 +119,7 @@
 <body>
 
     <div id="game-container">
-        <div id="loading-text">กำลังโหลดรูปภาพและตั้งค่าระบบกล้อง AR...</div>
+        <div id="loading-text">กำลังตั้งค่าระบบกล้อง AR...</div>
         
         <video id="webcam" autoplay playsinline></video>
         <canvas id="canvas-output"></canvas>
@@ -153,134 +153,25 @@
         let basketX = 0;
         let targetBasketX = 0; 
         let basketY = 0;
-        const basketWidth = 170;
+        const basketWidth = 180;
         const basketHeight = 110;
 
         let currentItem = null; 
-        const itemSize = 80; 
+        const itemSize = 75; 
 
-        // 🖼️ โหลดภาพพื้นหลังธรรมชาติ
+        // 🖼️ รูปพื้นหลังธรรมชาติ
         const imgBackground = new Image();
         imgBackground.crossOrigin = "anonymous";
         imgBackground.src = 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?fm=jpg&q=60&w=1000';
 
-        // 🔄 ใช้บริการ CORS Proxy ครอบลิงก์เพื่อป้องกันเบราว์เซอร์บล็อกภาพหาย
-        const proxy = "https://images.weserv.nl/?url=";
+        // 📦 ฝังรูปภาพในรูปแบบ SVG Data URI เพื่อป้องกัน CORS 100% (หน้าตาตรงตามที่คุณต้องการ)
+        const imgApple = new Image();
+        imgApple.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='38' cy='55' r='25' fill='%23e63946'/><circle cx='62' cy='55' r='25' fill='%23e63946'/><path d='M35,75 Q50,83 65,75' stroke='%23b21e29' stroke-width='4' fill='none'/><path d='M50,35 Q45,15 55,10' stroke='%235c3d24' stroke-width='5' fill='none'/><path d='M53,15 Q70,10 65,25 Q55,25 53,15' fill='%234ad66d'/></svg>";
 
-        // โหลดรูปภาพที่คุณระบุผ่านมาทางระบบ Proxy
-        const imgRock = new Image(); imgRock.crossOrigin = "anonymous";
-        imgRock.src = proxy + encodeURIComponent("https://png.pngtree.com/png-vector/20240801/ourlarge/pngtree-mountain-boulder-rock-png-image_13320663.png");
+        const imgBanana = new Image();
+        imgBanana.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path d='M20,20 Q60,20 70,60 Q45,75 15,45 Q35,40 20,20' fill='%23ffde4d'/><path d='M15,45 Q12,47 10,42 Q15,35 20,20' fill='%235c6b1a'/><path d='M68,58 Q72,62 75,60' stroke='%233a3a3a' stroke-width='4'/></svg>";
 
-        const imgBomb = new Image(); imgBomb.crossOrigin = "anonymous";
-        imgBomb.src = proxy + encodeURIComponent("https://e7.pngegg.com/pngimages/983/331/png-clipart-bomb-bomb-cartoon-bomb-explosion-cartoon-thumbnail.png");
+        const imgRock = new Image();
+        imgRock.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='20,75 30,30 70,25 85,65 50,85' fill='%237f8c8d'/><polygon points='30,30 50,55 70,25' fill='%2395a5a6'/><line x1='30' y1='30' x2='85' y2='65' stroke='%23555' stroke-width='2'/></svg>";
 
-        const imgApple = new Image(); imgApple.crossOrigin = "anonymous";
-        imgApple.src = proxy + encodeURIComponent("https://png.pngtree.com/element_our/20190529/ourmid/pngtree-cartoon-red-apple-illustration-image_1213812.jpg");
-
-        const imgBanana = new Image(); imgBanana.crossOrigin = "anonymous";
-        imgBanana.src = proxy + encodeURIComponent("https://img.pikbest.com/png-images/20250207/realistic-banana-png-on-white-background_11505027.png!w700wp");
-
-        const imgBasket = new Image(); imgBasket.crossOrigin = "anonymous";
-        imgBasket.src = proxy + encodeURIComponent("https://img.pikbest.com/png-images/20240930/high-quality-blank-fruits-basket-png-perfect-for-graphic-designs_10912028.png!sw800");
-
-        // คลังสิ่งของตก (ความเร็วสูง ตกไวสะใจแบบที่คุณชอบ)
-        const itemPool = [
-            { type: "apple", img: imgApple, points: 1, baseSpeed: 11 },
-            { type: "banana", img: imgBanana, points: 1, baseSpeed: 10.5 },
-            { type: "rock", img: imgRock, points: -1, baseSpeed: 13 },
-            { type: "bomb", img: imgBomb, points: -3, baseSpeed: 14 }
-        ];
-
-        function spawnNewItem() {
-            const randomTemplate = itemPool[Math.floor(Math.random() * itemPool.length)];
-            currentItem = {
-                type: randomTemplate.type,
-                img: randomTemplate.img,
-                points: randomTemplate.points,
-                speed: randomTemplate.baseSpeed + (Math.random() * 4), 
-                x: Math.random() * (canvasElement.width - 200) + 100,
-                y: -50
-            };
-        }
-
-        // 🤖 เรียกใช้งานระบบตรวจจับมือ MediaPipe
-        const hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-        });
-
-        hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.4,
-            minTrackingConfidence: 0.4
-        });
-
-        hands.onResults((results) => {
-            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-            
-            // 1. วาดกล้อง
-            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
-
-            // 2. วาดพื้นหลังโปร่งแสง 40%
-            try {
-                canvasCtx.save();
-                canvasCtx.globalAlpha = 0.4;
-                canvasCtx.drawImage(imgBackground, 0, 0, canvasElement.width, canvasElement.height);
-                canvasCtx.restore();
-            } catch(e) {}
-
-            // ดักจับและควบคุมมือ (ทิศทางซ้าย-ขวาขยับตามมือตรงเป๊ะ)
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                const wrist = landmarks[0]; 
-                targetBasketX = wrist.x * canvasElement.width;
-            }
-
-            // ตะกร้าวิ่งตามมืออย่างรวดเร็ว (Speed X ไวขึ้น)
-            basketX += (targetBasketX - basketX) * 0.45; 
-
-            // คำนวณระบบฟิสิกส์เกม
-            if (isPlaying && currentItem) {
-                currentItem.y += currentItem.speed;
-
-                // ตรวจสอบการชน (เก็บของใส่ตะกร้า)
-                if (currentItem.y >= basketY - 45 && currentItem.y <= basketY + 45) {
-                    if (Math.abs(currentItem.x - basketX) < basketWidth / 2) {
-                        score += currentItem.points;
-                        score = Math.max(0, score); 
-                        scoreTxt.innerText = "คะแนน: " + score;
-                        spawnNewItem();
-                    }
-                }
-
-                if (currentItem.y > canvasElement.height) {
-                    spawnNewItem();
-                }
-            }
-
-            // วาดสิ่งของที่ได้จากลิงก์
-            drawGameScene();
-        });
-
-        const camera = new Camera(video, {
-            onFrame: async () => {
-                await hands.send({ image: video });
-            },
-            width: 1280,
-            height: 720
-        });
-
-        // ตรวจสอบว่ารูปหลักๆ โหลดเสร็จเพื่อเริ่มเกม
-        let loadedImages = 0;
-        function checkImages() {
-            loadedImages++;
-            if (loadedImages >= 4) {
-                camera.start().then(() => {
-                    loadingTxt.style.display = "none";
-                    startBtn.style.display = "block";
-                    
-                    canvasElement.width = video.videoWidth || 1280;
-                    canvasElement.height = video.videoHeight || 720;
-                    basketY = canvasElement.height - 120;
-                    basketX = canvasElement.width / 2;
-                    targetBasketX = canvasElement.width /
+        const imgBomb = new Image();
